@@ -30,7 +30,7 @@ import smile.stat.distribution.GaussianDistribution;
  * 
  * @author Haifeng Li
  */
-public class NaiveMatrix implements DenseMatrix {
+public class NaiveMatrix extends DenseMatrix {
 
     /**
      * The original matrix.
@@ -287,5 +287,20 @@ public class NaiveMatrix implements DenseMatrix {
         }
 
         return new NaiveMatrix(B);
+    }
+
+    @Override
+    public double apply(int i, int j) {
+        throw new UnsupportedOperationException("");
+    }
+
+    @Override
+    public double[] diag() {
+        throw new UnsupportedOperationException("");
+    }
+
+    @Override
+    public double trace() {
+        throw new UnsupportedOperationException("");
     }
 }

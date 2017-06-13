@@ -123,15 +123,6 @@ public class DoubleHeapSelect {
     }
 
     /**
-     * Place the array in max-heap order. Note that the array is not fully sorted.
-     */
-    private static void heapify(double[] arr) {
-        int n = arr.length;
-        for (int i = n / 2 - 1; i >= 0; i--)
-            SortUtils.siftDown(arr, i, n - 1);
-    }
-
-    /**
      * Sorts the specified array into descending order. It is based on Shell
      * sort, which is very efficient because the array is almost sorted by
      * heapifying.

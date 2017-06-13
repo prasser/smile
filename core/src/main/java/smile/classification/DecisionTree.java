@@ -267,6 +267,9 @@ public class DecisionTree implements SoftClassifier<double[]>, Serializable {
      */
     class Node implements Serializable {
 
+        /** SVUID*/
+        private static final long serialVersionUID = 7167971471207545655L;
+        
         /**
          * Predicted class label for this node.
          */

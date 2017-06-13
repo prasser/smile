@@ -563,10 +563,8 @@ public class PlotCanvas extends JPanel {
      * Initialize the canvas.
      */
     private void initCanvas() {
-        GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
-        if (ge.isHeadless()) {
+        if (GraphicsEnvironment.isHeadless()) {
             setPreferredSize(new Dimension(1600,1200));
-
         }
 
         setLayout(new BorderLayout());

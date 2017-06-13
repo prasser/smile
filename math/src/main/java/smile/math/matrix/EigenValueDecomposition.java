@@ -15,8 +15,6 @@
  *******************************************************************************/
 package smile.math.matrix;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import smile.math.Complex;
 import smile.math.Math;
 
@@ -80,7 +78,6 @@ import smile.math.Math;
  * @author Haifeng Li
  */
 public class EigenValueDecomposition {
-    private static final Logger logger = LoggerFactory.getLogger(EigenValueDecomposition.class);
 
     /**
      * Array of (real part of) eigenvalues.

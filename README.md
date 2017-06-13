@@ -8,3 +8,5 @@ Changes
 * Made to compile/run on Java 7
 * Build with ANT
 * Provided as one Jar
+* Removed nd4j integration
+* Removed Scala integration

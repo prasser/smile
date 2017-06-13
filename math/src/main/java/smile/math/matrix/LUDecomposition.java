@@ -278,7 +278,6 @@ public class LUDecomposition {
      */
     public void solve(DenseMatrix B, DenseMatrix X) {
         int m = LU.nrows();
-        int n = LU.ncols();
 
         if (X == B) {
             throw new IllegalArgumentException("B and X should not be the same object.");

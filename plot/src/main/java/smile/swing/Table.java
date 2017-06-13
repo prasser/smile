@@ -26,7 +26,6 @@ import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.JViewport;
 import javax.swing.ListSelectionModel;
-import javax.swing.SortOrder;
 import javax.swing.UIManager;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
@@ -37,9 +36,6 @@ import javax.swing.table.TableCellRenderer;
 import javax.swing.table.TableColumn;
 import javax.swing.table.TableColumnModel;
 import javax.swing.table.TableModel;
-
-import org.jdesktop.swingx.JXTable;
-import org.jdesktop.swingx.decorator.HighlighterFactory;
 
 import smile.swing.table.ByteArrayCellRenderer;
 import smile.swing.table.ColorCellEditor;
@@ -69,7 +65,7 @@ import smile.swing.table.TableCopyPasteAdapter;
  * @author Haifeng Li
  */
 @SuppressWarnings("serial")
-public class Table extends JXTable {
+public class Table extends JTable {
 
     /**
      * Color renderer.
@@ -210,9 +206,6 @@ public class Table extends JXTable {
     private void init() {
         setAutoResizeMode(AUTO_RESIZE_OFF);
         setCellSelectionEnabled(true);
-        setColumnControlVisible(true);
-        setHighlighters(HighlighterFactory.createAlternateStriping());
-        setSortOrderCycle(SortOrder.ASCENDING, SortOrder.DESCENDING, SortOrder.UNSORTED);
         TableCopyPasteAdapter.apply(this);
         getTableHeader().setDefaultRenderer(new MultiColumnSortTableHeaderCellRenderer());
         // workaround with table row filter to let it register to table changes
@@ -318,16 +311,13 @@ public class Table extends JXTable {
      * This table must be added to the row header of the JScrollPane that
      * contains the main table.
      */
-    public class RowHeader extends JXTable implements ChangeListener, PropertyChangeListener {
+    public class RowHeader extends JTable implements ChangeListener, PropertyChangeListener {
 
         /**
          * Constructor.
          */
         public RowHeader() {
             Table.this.addPropertyChangeListener(this);
-            
-            // row header should not allow to sort.
-            setSortable(false);
             
             setFocusable(false);
             setAutoCreateColumnsFromModel(false);

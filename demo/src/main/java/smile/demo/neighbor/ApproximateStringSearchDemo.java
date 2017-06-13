@@ -25,6 +25,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.BufferedReader;
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
@@ -37,7 +38,6 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
 
-import smile.plot.PlotCanvas;
 import smile.math.Math;
 import smile.math.distance.EditDistance;
 import smile.neighbor.BKTree;
@@ -45,6 +45,7 @@ import smile.neighbor.CoverTree;
 import smile.neighbor.LinearSearch;
 import smile.neighbor.Neighbor;
 import smile.plot.BarPlot;
+import smile.plot.PlotCanvas;
 
 /**
  *
@@ -95,9 +96,10 @@ public class ApproximateStringSearchDemo extends JPanel implements Runnable, Act
             System.out.print("Loading dataset...");
             List<String> words = new ArrayList<>();
 
+            BufferedReader input = null;
             try {
                 FileInputStream stream = new FileInputStream(smile.data.parser.IOUtils.getTestDataFile("index.noun"));
-                BufferedReader input = new BufferedReader(new InputStreamReader(stream));
+                input = new BufferedReader(new InputStreamReader(stream));
                 String line = input.readLine();
                 while (line != null) {
                     if (!line.startsWith(" ")) {
@@ -108,6 +110,14 @@ public class ApproximateStringSearchDemo extends JPanel implements Runnable, Act
                 }
             } catch (Exception e) {
                 System.err.println(e);
+            }
+            
+            if (input != null) {
+                try {
+                    input.close();
+                } catch (IOException e) {
+                    System.err.println(e);
+                }
             }
 
             data = words.toArray(new String[1]);

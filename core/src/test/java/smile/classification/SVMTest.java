@@ -16,12 +16,14 @@
 
 package smile.classification;
 
+import static org.junit.Assert.assertTrue;
+
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import static org.junit.Assert.*;
+
 import smile.data.AttributeDataset;
 import smile.data.NominalAttribute;
 import smile.data.parser.ArffParser;
@@ -95,8 +97,7 @@ public class SVMTest {
                     error++;
                 }
                 double[] prob = new double[3];
-                int yp = svm.predict(x[i], prob);
-                //System.out.format("%d %d %.2f, %.2f %.2f\n", y[i], yp, prob[0], prob[1], prob[2]);
+                svm.predict(x[i], prob);
             }
             System.out.println("Gaussian ONE vs. ALL error = " + error);
             assertTrue(error <= 5);
@@ -115,8 +116,7 @@ public class SVMTest {
                     error++;
                 }
                 double[] prob = new double[3];
-                int yp = svm.predict(x[i], prob);
-                //System.out.format("%d %d %.2f, %.2f %.2f\n", y[i], yp, prob[0], prob[1], prob[2]);
+                svm.predict(x[i], prob);
             }
             System.out.println("Gaussian ONE vs. ONE error = " + error);
             assertTrue(error <= 5);

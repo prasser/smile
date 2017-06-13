@@ -558,7 +558,7 @@ public class LASSO  implements Regression<double[]>, Serializable {
         return sum;
     }
 
-    class PCGMatrix implements Matrix, Preconditioner {
+    class PCGMatrix extends Matrix implements Preconditioner {
 
         Matrix A;
         Matrix AtA;
@@ -675,6 +675,16 @@ public class LASSO  implements Regression<double[]>, Serializable {
 
         @Override
         public double[] atxpy(double[] x, double[] y, double b) {
+            throw new UnsupportedOperationException("Not supported yet.");
+        }
+
+        @Override
+        public double[] diag() {
+            throw new UnsupportedOperationException("Not supported yet.");
+        }
+
+        @Override
+        public double trace() {
             throw new UnsupportedOperationException("Not supported yet.");
         }
     }

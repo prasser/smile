@@ -121,7 +121,7 @@ public class SNLSHTest {
             long sign2 = signCache.get(sentence.line);
             double distance = HammingDistance.d(sign1, sign2);
             if(distance < heap.peek().distance) {
-                heap.add(new Neighbor<>(sentence, sentence, 0, distance));
+                heap.add(new Neighbor<SNLSH.AbstractSentence,SNLSH.AbstractSentence>(sentence, sentence, 0, distance));
                 hit++;
             }
         }
@@ -154,7 +154,7 @@ public class SNLSHTest {
                 minKey = sentence;
             }
         }
-        return new Neighbor<>(minKey, minKey, 0, minDist);
+        return new Neighbor<SNLSH.AbstractSentence,SNLSH.AbstractSentence>(minKey, minKey, 0, minDist);
     }
 
     private void linearRange(Sentence q, double d, List<Neighbor<SNLSH.AbstractSentence,SNLSH.AbstractSentence>> neighbors) {
@@ -166,7 +166,7 @@ public class SNLSHTest {
             long sign2 = signCache.get(sentence.line);
             double distance = HammingDistance.d(sign1, sign2);
             if (distance <= d) {
-                neighbors.add(new Neighbor<>(sentence, sentence, 0, distance));
+                neighbors.add(new Neighbor<SNLSH.AbstractSentence,SNLSH.AbstractSentence>(sentence, sentence, 0, distance));
             }
         }
     }

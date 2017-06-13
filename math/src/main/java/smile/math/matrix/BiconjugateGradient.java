@@ -32,7 +32,7 @@ public class BiconjugateGradient {
     /** Returns a simple preconditioner matrix that is the
      * trivial diagonal part of A in some cases.
      */
-    private static Preconditioner diagonalPreconditioner(Matrix A) {
+    private static Preconditioner diagonalPreconditioner(final Matrix A) {
         return new Preconditioner() {
             public void asolve(double[] b, double[] x) {
                 double[] diag = A.diag();

@@ -107,9 +107,10 @@ public class Math {
                 // Otherwise, all trees of random forest are same except the main thread one.
 
                 java.security.SecureRandom sr = new java.security.SecureRandom();
-                byte[] bytes = sr.generateSeed(Long.BYTES);
+                final int Long_BYTES = 8;
+                byte[] bytes = sr.generateSeed(Long_BYTES);
                 long seed = 0;
-                for (int i = 0; i < Long.BYTES; i++) {
+                for (int i = 0; i < Long_BYTES; i++) {
                     seed <<= 8;
                     seed |= (bytes[i] & 0xFF);
                 }
@@ -2997,12 +2998,12 @@ public class Math {
      * @param lo lower limit of range
      * @param hi upper limit of range
      */
-    public static java.util.function.Function<double[], double[]> rescale(double[][] x, double lo, double hi) {
-        int n = x.length;
-        int p = x[0].length;
+    public static java.util.function.Function<double[], double[]> rescale(double[][] x, final double lo, final double hi) {
+        final int n = x.length;
+        final int p = x[0].length;
 
-        double[] min = colMin(x);
-        double[] max = colMax(x);
+        final double[] min = colMin(x);
+        final double[] max = colMax(x);
 
         for (int j = 0; j < p; j++) {
             double scale = max[j] - min[j];
@@ -3016,42 +3017,47 @@ public class Math {
                 }
             }
         }
+        
+        return new java.util.function.Function<double[], double[]>(){
 
-        return (double[] xi) -> {
-            if (xi.length != p)
-                throw new IllegalArgumentException(String.format("array size: %d, expected: %d", xi.length, p));
+            @Override
+            public double[] apply(final double[] xi) {
+                if (xi.length != p)
+                    throw new IllegalArgumentException(String.format("array size: %d, expected: %d", xi.length, p));
 
-            double l = hi - lo;
-            double[] y = new double[p];
-            for (int j = 0; j < p; j++) {
-                double scale = max[j] - min[j];
-                if (!Math.isZero(scale)) {
-                    y[j] = (xi[j] - min[j]) / scale;
-                } else {
-                    y[j] = 0.5;
+                double l = hi - lo;
+                double[] y = new double[p];
+                for (int j = 0; j < p; j++) {
+                    double scale = max[j] - min[j];
+                    if (!Math.isZero(scale)) {
+                        y[j] = (xi[j] - min[j]) / scale;
+                    } else {
+                        y[j] = 0.5;
+                    }
+                    y[j] = lo + l * y[j];
                 }
-                y[j] = lo + l * y[j];
-            }
 
-            return y;
+                return y;
+            }
+            
         };
     }
 
     /**
      * Standardizes each column of a matrix to 0 mean and unit variance.
      */
-    public static java.util.function.Function<double[], double[]> standardize(double[][] x) {
-        int n = x.length;
-        int p = x[0].length;
+    public static java.util.function.Function<double[], double[]> standardize(final double[][] x) {
+        final int n = x.length;
+        final int p = x[0].length;
 
-        double[] center = colMean(x);
+        final double[] center = colMean(x);
         for (int i = 0; i < n; i++) {
             for (int j = 0; j < p; j++) {
                 x[i][j] = x[i][j] - center[j];
             }
         }
 
-        double[] scale = new double[p];
+        final double[] scale = new double[p];
         for (int j = 0; j < p; j++) {
             for (int i = 0; i < n; i++) {
                 scale[j] += Math.sqr(x[i][j]);
@@ -3065,7 +3071,11 @@ public class Math {
             }
         }
 
-        return (double[] xi) -> {
+        return new java.util.function.Function<double[], double[]>(){
+
+            @Override
+            public double[] apply(final double[] xi) {
+
             if (xi.length != p)
                 throw new IllegalArgumentException(String.format("array size: %d, expected: %d", xi.length, p));
 
@@ -3079,6 +3089,7 @@ public class Math {
             }
 
             return y;
+        }
         };
     }
 
@@ -3086,11 +3097,11 @@ public class Math {
      * Unitizes each column of a matrix to unit length (L_2 norm).
      * @param centerizing If true, centerize each column to 0 mean.
      */
-    public static java.util.function.Function<double[], double[]> normalize(double[][] x, boolean centerizing) {
-        int n = x.length;
-        int p = x[0].length;
+    public static java.util.function.Function<double[], double[]> normalize(final double[][] x, final boolean centerizing) {
+        final int n = x.length;
+        final int p = x[0].length;
 
-        double[] center = colMean(x);
+        final double[] center = colMean(x);
         if (centerizing) {
             for (int i = 0; i < n; i++) {
                 for (int j = 0; j < p; j++) {
@@ -3099,7 +3110,7 @@ public class Math {
             }
         }
 
-        double[] scale = new double[p];
+        final double[] scale = new double[p];
         for (int j = 0; j < p; j++) {
             for (int i = 0; i < n; i++) {
                 scale[j] += Math.sqr(x[i][j]);
@@ -3115,7 +3126,12 @@ public class Math {
             }
         }
 
-        return (double[] xi) -> {
+
+        return new java.util.function.Function<double[], double[]>(){
+
+            @Override
+            public double[] apply(final double[] xi) {
+
             if (xi.length != p)
                 throw new IllegalArgumentException(String.format("array size: %d, expected: %d", xi.length, p));
 
@@ -3131,6 +3147,7 @@ public class Math {
             }
 
             return y;
+        }
         };
     }
 

@@ -58,7 +58,7 @@ import java.util.Arrays;
  * 
  * @author Haifeng Li
  */
-public class BandMatrix implements Matrix, LinearSolver {
+public class BandMatrix extends Matrix implements LinearSolver {
     /**
      * Compact store of band matrix as A[0, n-1][0, m1+m2].
      */
@@ -485,5 +485,15 @@ public class BandMatrix implements Matrix, LinearSolver {
         for (int i = 0; i < n; i++) {
             x[i] -= r[i];
         }
+    }
+
+    @Override
+    public double apply(int i, int j) {
+        throw new UnsupportedOperationException("");
+    }
+
+    @Override
+    public double trace() {
+        throw new UnsupportedOperationException("");
     }
 }

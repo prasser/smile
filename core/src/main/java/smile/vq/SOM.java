@@ -402,7 +402,7 @@ public class SOM implements Clustering<double[]> {
         }
 
         int[][] clusterLabels = new int[height][width];
-        for (int i = 0, l = 0; i < height; i++) {
+        for (int i = 0; i < height; i++) {
             for (int j = 0; j < width; j++) {
                 clusterLabels[i][j] = y[i*width + j];
             }

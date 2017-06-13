@@ -80,6 +80,10 @@ public class RandomForest implements SoftClassifier<double[]>, Serializable {
      * tree votes.
      */
     static class Tree implements Serializable {
+
+        /** SVUID*/
+        private static final long serialVersionUID = 7167971471207545655L;
+        
         DecisionTree tree;
         double weight;
         Tree(DecisionTree tree, double weight) {

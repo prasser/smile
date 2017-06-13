@@ -125,7 +125,7 @@ public class LinearSearch<T> implements NearestNeighborSearch<T,T>, KNNSearch<T,
         SimpleNeighbor<T> neighbor = new SimpleNeighbor<>(null, 0, Double.MAX_VALUE);
         @SuppressWarnings("unchecked")
         SimpleNeighbor<T>[] neighbors = (SimpleNeighbor<T>[]) java.lang.reflect.Array.newInstance(neighbor.getClass(), k);
-        HeapSelect<Neighbor<T,T>> heap = new HeapSelect<>(neighbors);
+        HeapSelect<Neighbor<T,T>> heap = new HeapSelect<Neighbor<T,T>>(neighbors);
         for (int i = 0; i < k; i++) {
             heap.add(neighbor);
             neighbor = new SimpleNeighbor<>(null, 0, Double.MAX_VALUE);

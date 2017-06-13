@@ -24,7 +24,7 @@ import smile.stat.distribution.GaussianDistribution;
  * A dense matrix whose data is stored in a single 1D array of
  * doubles in column major order.
  */
-public class ColumnMajorMatrix implements DenseMatrix {
+public class ColumnMajorMatrix extends DenseMatrix {
 
     /**
      * The matrix storage.
@@ -826,5 +826,20 @@ public class ColumnMajorMatrix implements DenseMatrix {
             }
         }
         return C;
+    }
+
+    @Override
+    public double apply(int i, int j) {
+        throw new UnsupportedOperationException("");
+    }
+
+    @Override
+    public double[] diag() {
+        throw new UnsupportedOperationException("");
+    }
+
+    @Override
+    public double trace() {
+        throw new UnsupportedOperationException("");
     }
 }

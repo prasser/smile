@@ -242,6 +242,9 @@ public class RegressionTree implements Regression<double[]>, Serializable {
      */
     class Node implements Serializable {
 
+        /** SVUID*/
+        private static final long serialVersionUID = 552827837910084737L;
+        
         /**
          * Predicted real value for this node.
          */

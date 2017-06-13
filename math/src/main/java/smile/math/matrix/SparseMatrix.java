@@ -39,7 +39,7 @@ import smile.math.Math;
  *
  * @author Haifeng Li
  */
-public class SparseMatrix implements Matrix, MatrixMultiplication<SparseMatrix, SparseMatrix> {
+public class SparseMatrix extends Matrix implements MatrixMultiplication<SparseMatrix, SparseMatrix> {
     /**
      * The number of rows.
      */
@@ -490,5 +490,15 @@ public class SparseMatrix implements Matrix, MatrixMultiplication<SparseMatrix, 
         }
 
         return d;
+    }
+
+    @Override
+    public double apply(int i, int j) {
+        throw new UnsupportedOperationException("");
+    }
+
+    @Override
+    public double trace() {
+        throw new UnsupportedOperationException("");
     }
 }

@@ -28,6 +28,9 @@ import java.util.Date;
  */
 public class DateAttribute extends Attribute {
 
+    /** SVUID*/
+    private static final long serialVersionUID = -1555106434326106037L;
+
     /**
      * Date string format.
      */

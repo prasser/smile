@@ -24,6 +24,10 @@ import java.text.ParseException;
  * @author Haifeng Li
  */
 public abstract class Attribute implements Serializable {
+    
+    /** SVUID*/
+    private static final long serialVersionUID = -1555106434326106037L;
+
     /**
      * The type of attributes.
      */

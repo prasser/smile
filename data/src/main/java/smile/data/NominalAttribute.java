@@ -28,6 +28,9 @@ import java.util.List;
  */
 public class NominalAttribute extends Attribute {
 
+    /** SVUID*/
+    private static final long serialVersionUID = -1555106434326106037L;
+
     /**
      * True if the string values of the nominal attribute is a open set.
      * The new string values will be added into the attribute when calling

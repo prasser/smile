@@ -24,6 +24,9 @@ import java.text.ParseException;
  */
 public class NumericAttribute extends Attribute {
 
+    /** SVUID*/
+    private static final long serialVersionUID = -1555106434326106037L;
+
     /**
      * Constructor.
      */
