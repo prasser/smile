@@ -20,12 +20,13 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Callable;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import smile.data.Attribute;
 import smile.data.NumericAttribute;
 import smile.math.Math;
-import smile.util.MulticoreExecutor;
 import smile.util.SmileUtils;
 import smile.validation.Accuracy;
 import smile.validation.ClassificationMeasure;
@@ -294,6 +295,16 @@ public class RandomForest extends SoftClassifier<double[]> implements Serializab
             this.prediction = prediction;
             this.interrupt = interrupt;
         }
+        
+        /**
+         * Checks for interrupts
+         * @throws InterruptedException 
+         */
+        protected void interrupt() throws TrainingInterruptedException {
+            if (this.interrupt != null && this.interrupt.interrupt) {
+                throw new TrainingInterruptedException();
+            }
+        }
 
         @Override
         public Tree call() {
@@ -309,6 +320,7 @@ public class RandomForest extends SoftClassifier<double[]> implements Serializab
                     int nj = 0;
                     ArrayList<Integer> cj = new ArrayList<>();
                     for (int i = 0; i < n; i++) {
+                        interrupt();
                         if (y[i] == l) {
                             cj.add(i);
                             nj++;
@@ -319,6 +331,7 @@ public class RandomForest extends SoftClassifier<double[]> implements Serializab
                     // But we switch to down sampling, which seems has better performance.
                     int size = nj / classWeight[l];
                     for (int i = 0; i < size; i++) {
+                        interrupt();
                         int xi = Math.randomInt(nj);
                         samples[cj.get(xi)] += 1; //classWeight[l];
                     }
@@ -334,6 +347,7 @@ public class RandomForest extends SoftClassifier<double[]> implements Serializab
 
                 int[] nc = new int[k];
                 for (int i = 0; i < n; i++) {
+                    interrupt();
                     nc[y[i]]++;
                 }
 
@@ -341,6 +355,7 @@ public class RandomForest extends SoftClassifier<double[]> implements Serializab
                     int subj = (int) Math.round(nc[l] * subsample / classWeight[l]);
                     int count = 0;
                     for (int i = 0; i < n && count < subj; i++) {
+                        interrupt();
                         int xi = perm[i];
                         if (y[xi] == l) {
                             samples[xi] += 1; //classWeight[l];
@@ -356,6 +371,7 @@ public class RandomForest extends SoftClassifier<double[]> implements Serializab
             int oob = 0;
             int correct = 0;
             for (int i = 0; i < n; i++) {
+                interrupt();
                 if (samples[i] == 0) {
                     oob++;
                     int p = tree.predict(x[i]);
@@ -397,6 +413,7 @@ public class RandomForest extends SoftClassifier<double[]> implements Serializab
     }
     private static final long serialVersionUID = 1L;
     private static final Logger logger = LoggerFactory.getLogger(RandomForest.class);
+    
     /**
      * Forest of decision trees. The second value is the accuracy of
      * tree on the OOB samples, which can be used a weight when aggregating
@@ -514,20 +531,23 @@ public class RandomForest extends SoftClassifier<double[]> implements Serializab
         for (int i = 0; i < ntrees; i++) {
             tasks.add(new TrainingTask(attributes, x, y, maxNodes, nodeSize, mtry, subsample, rule, classWeight, order, prediction, interrupt));
         }
+//        
+//        try {
+//            trees = MulticoreExecutor.run(tasks);
+//        } catch (Exception ex) {
+//            logger.error("Failed to train random forest on multi-core", ex);
+//      }
         
-        try {
-            trees = MulticoreExecutor.run(tasks);
-        } catch (Exception ex) {
-            logger.error("Failed to train random forest on multi-core", ex);
-
-            trees = new ArrayList<>(ntrees);
-            for (int i = 0; i < ntrees; i++) {
-                trees.add(tasks.get(i).call());
-            }
+        // Always use just one core
+        trees = new ArrayList<>(ntrees);
+        for (int i = 0; i < ntrees; i++) {
+            trees.add(tasks.get(i).call());
         }
+
         
         int m = 0;
         for (int i = 0; i < n; i++) {
+            interrupt();
             int pred = Math.whichMax(prediction[i]);
             if (prediction[i][pred] > 0) {
                 m++;
@@ -543,6 +563,7 @@ public class RandomForest extends SoftClassifier<double[]> implements Serializab
         
         importance = new double[attributes.length];
         for (Tree tree : trees) {
+            interrupt();
             double[] imp = tree.tree.importance();
             for (int i = 0; i < imp.length; i++) {
                 importance[i] += imp[i];

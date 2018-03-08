@@ -413,6 +413,7 @@ public class DecisionTree extends SoftClassifier<double[]> implements Serializab
             int label = -1;
             boolean pure = true;
             for (int i = 0; i < x.length; i++) {
+                interrupt();
                 if (samples[i] > 0) {
                     if (label == -1) {
                         label = y[i];
@@ -441,6 +442,7 @@ public class DecisionTree extends SoftClassifier<double[]> implements Serializab
             int[] count = new int[k];
             int[] falseCount = new int[k];
             for (int i = 0; i < x.length; i++) {
+                interrupt();
                 if (samples[i] > 0) {
                     count[y[i]] += samples[i];
                 }
@@ -451,6 +453,7 @@ public class DecisionTree extends SoftClassifier<double[]> implements Serializab
             int p = attributes.length;
             int[] variables = new int[p];
             for (int i = 0; i < p; i++) {
+                interrupt();
                 variables[i] = i;
             }
             
@@ -459,6 +462,7 @@ public class DecisionTree extends SoftClassifier<double[]> implements Serializab
 
                 // Random forest already runs on parallel.
                 for (int j = 0; j < mtry; j++) {
+                    interrupt();
                     Node split = findBestSplit(n, count, falseCount, impurity, variables[j]);
                     if (split.splitScore > node.splitScore) {
                         node.splitFeature = split.splitFeature;
@@ -518,12 +522,14 @@ public class DecisionTree extends SoftClassifier<double[]> implements Serializab
                 int[][] trueCount = new int[m][k];
 
                 for (int i = 0; i < x.length; i++) {
+                    interrupt();
                     if (samples[i] > 0) {
                         trueCount[(int) x[i][j]][y[i]] += samples[i];
                     }
                 }
 
                 for (int l = 0; l < m; l++) {
+                    interrupt();
                     int tc = Math.sum(trueCount[l]);
                     int fc = n - tc;
 
@@ -555,6 +561,7 @@ public class DecisionTree extends SoftClassifier<double[]> implements Serializab
                 int prevy = -1;
 
                 for (int i : order[j]) {
+                    interrupt();
                     if (samples[i] > 0) {
                         if (Double.isNaN(prevx) || x[i][j] == prevx || y[i] == prevy) {
                             prevx = x[i][j];
@@ -575,6 +582,7 @@ public class DecisionTree extends SoftClassifier<double[]> implements Serializab
                         }
 
                         for (int l = 0; l < k; l++) {
+                            interrupt();
                             falseCount[l] = count[l] - trueCount[l];
                         }
 
@@ -620,6 +628,7 @@ public class DecisionTree extends SoftClassifier<double[]> implements Serializab
 
             if (attributes[node.splitFeature].getType() == Attribute.Type.NOMINAL) {
                 for (int i = 0; i < n; i++) {
+                    interrupt();
                     if (samples[i] > 0) {
                         if (x[i][node.splitFeature] == node.splitValue) {
                             trueSamples[i] = samples[i];
@@ -633,6 +642,7 @@ public class DecisionTree extends SoftClassifier<double[]> implements Serializab
                 }
             } else if (attributes[node.splitFeature].getType() == Attribute.Type.NUMERIC) {
                 for (int i = 0; i < n; i++) {
+                    interrupt();
                     if (samples[i] > 0) {
                         if (x[i][node.splitFeature] <= node.splitValue) {
                             trueSamples[i] = samples[i];
@@ -658,6 +668,7 @@ public class DecisionTree extends SoftClassifier<double[]> implements Serializab
             double[] trueChildPosteriori = new double[k];
             double[] falseChildPosteriori = new double[k];
             for (int i = 0; i < n; i++) {
+                interrupt();
                 int yi = y[i];
                 trueChildPosteriori[yi] += trueSamples[i];
                 falseChildPosteriori[yi] += samples[i];
@@ -665,6 +676,7 @@ public class DecisionTree extends SoftClassifier<double[]> implements Serializab
 
             // add-k smoothing of posteriori probability
             for (int i = 0; i < k; i++) {
+                interrupt();
                 trueChildPosteriori[i] = (trueChildPosteriori[i] + 1) / (tc + k);
                 falseChildPosteriori[i] = (falseChildPosteriori[i] + 1) / (fc + k);
             }
@@ -824,6 +836,7 @@ public class DecisionTree extends SoftClassifier<double[]> implements Serializab
             this.order = new int[p][];
 
             for (int j = 0; j < p; j++) {
+                interrupt();
                 if (attributes[j] instanceof NumericAttribute) {
                     for (int i = 0; i < n; i++) {
                         a[i] = x[i][j];
@@ -841,17 +854,20 @@ public class DecisionTree extends SoftClassifier<double[]> implements Serializab
         if (samples == null) {
             samples = new int[n];
             for (int i = 0; i < n; i++) {
+                interrupt();
                 samples[i] = 1;
                 count[y[i]]++;
             }
         } else {
             for (int i = 0; i < n; i++) {
+                interrupt();
                 count[y[i]] += samples[i];
             }
         }
 
         double[] posteriori = new double[k];
         for (int i = 0; i < k; i++) {
+            interrupt();
             posteriori[i] = (double) count[i] / n;
         }
         root = new Node(Math.whichMax(count), posteriori);
@@ -865,6 +881,7 @@ public class DecisionTree extends SoftClassifier<double[]> implements Serializab
         // Pop best leaf from priority queue, split it, and push
         // children nodes into the queue if possible.
         for (int leaves = 1; leaves < this.maxNodes; leaves++) {
+            interrupt();
             // parent is the leaf to split
             TrainNode node = nextSplits.poll();
             if (node == null) {
