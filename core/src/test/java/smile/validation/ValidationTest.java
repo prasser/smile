@@ -77,7 +77,7 @@ public class ValidationTest {
             double[][] testx = test.toArray(new double[test.size()][]);
             int[] testy = test.toArray(new int[test.size()]);
 
-            LDA lda = new LDA(x, y);
+            LDA lda = new LDA(x, y, null);
             double accuracy = Validation.test(lda, testx, testy);
             System.out.println("accuracy = " + accuracy);
             assertEquals(0.8724, accuracy, 1E-4);
@@ -144,7 +144,7 @@ public class ValidationTest {
             double[][] testx = test.toArray(new double[test.size()][]);
             int[] testy = test.toArray(new int[test.size()]);
 
-            LDA lda = new LDA(x, y);
+            LDA lda = new LDA(x, y, null);
             ClassificationMeasure[] measures = {new Accuracy()};
             double[] accuracy = Validation.test(lda, testx, testy, measures);
             System.out.println("accuracy = " + accuracy[0]);
@@ -211,7 +211,7 @@ public class ValidationTest {
             double[][] x = iris.toArray(new double[iris.size()][]);
             int[] y = iris.toArray(new int[iris.size()]);
 
-            ClassifierTrainer<double[]> trainer = new LDA.Trainer();
+            ClassifierTrainer<double[]> trainer = new LDA.Trainer(null);
             double accuracy = Validation.loocv(trainer, x, y);
             
             System.out.println("LOOCV accuracy = " + accuracy);
@@ -257,7 +257,7 @@ public class ValidationTest {
             double[][] x = weather.toArray(new double[weather.size()][]);
             int[] y = weather.toArray(new int[weather.size()]);
 
-            DecisionTree.Trainer trainer = new DecisionTree.Trainer(3);
+            DecisionTree.Trainer trainer = new DecisionTree.Trainer(3, null);
             trainer.setAttributes(weather.attributes());
             ClassificationMeasure[] measures = {new Accuracy(), new Recall(), new Precision()};
             double[] results = Validation.loocv(trainer, x, y, measures);
@@ -308,7 +308,7 @@ public class ValidationTest {
             double[][] x = iris.toArray(new double[iris.size()][]);
             int[] y = iris.toArray(new int[iris.size()]);
 
-            ClassifierTrainer<double[]> trainer = new LDA.Trainer();
+            ClassifierTrainer<double[]> trainer = new LDA.Trainer(null);
             double accuracy = Validation.cv(10, trainer, x, y);
             
             System.out.println("10-fold CV accuracy = " + accuracy);
@@ -353,7 +353,7 @@ public class ValidationTest {
             double[][] x = iris.toArray(new double[iris.size()][]);
             int[] y = iris.toArray(new int[iris.size()]);
 
-            ClassifierTrainer<double[]> trainer = new LDA.Trainer();
+            ClassifierTrainer<double[]> trainer = new LDA.Trainer(null);
             ClassificationMeasure[] measures = {new Accuracy()};
             double[] results = Validation.cv(10, trainer, x, y, measures);
             for (int i = 0; i < measures.length; i++) {
@@ -402,7 +402,7 @@ public class ValidationTest {
             double[][] x = iris.toArray(new double[iris.size()][]);
             int[] y = iris.toArray(new int[iris.size()]);
 
-            ClassifierTrainer<double[]> trainer = new LDA.Trainer();
+            ClassifierTrainer<double[]> trainer = new LDA.Trainer(null);
             double[] accuracy = Validation.bootstrap(100, trainer, x, y);
             
             System.out.println("100-fold bootstrap accuracy average = " + Math.mean(accuracy));
@@ -449,7 +449,7 @@ public class ValidationTest {
             double[][] x = weather.toArray(new double[weather.size()][]);
             int[] y = weather.toArray(new int[weather.size()]);
 
-            DecisionTree.Trainer trainer = new DecisionTree.Trainer(3);
+            DecisionTree.Trainer trainer = new DecisionTree.Trainer(3, null);
             trainer.setAttributes(weather.attributes());
             ClassificationMeasure[] measures = {new Accuracy(), new Recall(), new Precision()};
             double[][] results = Validation.bootstrap(100, trainer, x, y, measures);

@@ -99,9 +99,196 @@ import smile.validation.ClassificationMeasure;
  * 
  * @author Haifeng Li
  */
-public class GradientTreeBoost implements SoftClassifier<double[]>, Serializable {
-    private static final long serialVersionUID = 1L;
+public class GradientTreeBoost extends SoftClassifier<double[]> implements Serializable {
+    /**
+     * Trainer for GradientTreeBoost classifiers.
+     */
+    public static class Trainer extends ClassifierTrainer<double[]> {
+        /**
+         * The number of trees.
+         */
+        private int ntrees = 500;
+        /**
+         * The shrinkage parameter in (0, 1] controls the learning rate of procedure.
+         */
+        private double shrinkage = 0.005;
+        /**
+         * The number of leaves in each tree.
+         */
+        private int maxNodes = 6;
+        /**
+         * The sampling rate for stochastic tree boosting.
+         */
+        private double subsample = 0.7;
 
+        /**
+         * Constructor.
+         * 
+         * @param attributes the attributes of independent variable.
+         * @param ntrees the number of trees.
+         */
+        public Trainer(Attribute[] attributes, int ntrees) {
+            super(attributes);
+
+            if (ntrees < 1) {
+                throw new IllegalArgumentException("Invalid number of trees: " + ntrees);
+            }
+
+            this.ntrees = ntrees;
+        }
+
+        /**
+         * Constructor.
+         * 
+         * @param ntrees the number of trees.
+         * @param interrupt
+         */
+        public Trainer(int ntrees, TrainingInterrupt interrupt) {
+            super(interrupt);
+            if (ntrees < 1) {
+                throw new IllegalArgumentException("Invalid number of trees: " + ntrees);
+            }
+
+            this.ntrees = ntrees;
+        }
+
+        /**
+         * Default constructor of 500 trees.
+         * @param interrupt
+         */
+        public Trainer(TrainingInterrupt interrupt) {
+            super(interrupt);
+        }
+        
+        /**
+         * Sets the maximum number of leaf nodes in the tree.
+         * @param maxNodes the maximum number of leaf nodes in the tree.
+         */
+        public Trainer setMaxNodes(int maxNodes) {
+            if (maxNodes < 2) {
+                throw new IllegalArgumentException("Invalid maximum number of leaf nodes: " + maxNodes);
+            }
+            
+            this.maxNodes = maxNodes;
+            return this;
+        }
+        
+        /**
+         * Sets the number of trees in the random forest.
+         * @param ntrees the number of trees.
+         */
+        public Trainer setNumTrees(int ntrees) {
+            if (ntrees < 1) {
+                throw new IllegalArgumentException("Invalid number of trees: " + ntrees);
+            }
+
+            this.ntrees = ntrees;
+            return this;
+        }
+        
+        /**
+         * Sets the sampling rate for stochastic tree boosting.
+         * @param subsample the sampling rate for stochastic tree boosting.
+         */
+        public Trainer setSamplingRates(double subsample) {
+            if (subsample <= 0 || subsample > 1) {
+                throw new IllegalArgumentException("Invalid sampling fraction: " + subsample);
+            }
+
+            this.subsample = subsample;
+            return this;
+        }
+
+        /**
+         * Sets the shrinkage parameter in (0, 1] controls the learning rate of procedure.
+         * @param shrinkage the learning rate.
+         */
+        public Trainer setShrinkage(double shrinkage) {
+            if (shrinkage <= 0 || shrinkage > 1) {
+                throw new IllegalArgumentException("Invalid shrinkage: " + shrinkage);
+            }
+
+            this.shrinkage = shrinkage;
+            return this;
+        }
+        
+        @Override
+        public GradientTreeBoost train(double[][] x, int[] y) {
+            return new GradientTreeBoost(attributes, x, y, ntrees, maxNodes, shrinkage, subsample, interrupt);
+        }
+    }
+
+    /**
+     * Class to calculate node output for two-class logistic regression.
+     */
+    class L2NodeOutput implements RegressionTree.NodeOutput {
+
+        /**
+         * Pseudo response to fit.
+         */
+        double[] y;
+        /**
+         * Constructor.
+         * @param y pseudo response to fit.
+         */
+        public L2NodeOutput(double[] y) {
+            this.y = y;
+        }
+        
+        @Override
+        public double calculate(int[] samples) {
+            double nu = 0.0;
+            double de = 0.0;
+            for (int i = 0; i < samples.length; i++) {
+                if (samples[i] > 0) {
+                    double abs = Math.abs(y[i]);
+                    nu += y[i];
+                    de += abs * (2.0 - abs);
+                }
+            }
+            
+            return nu / de;
+        }        
+    }
+    /**
+     * Class to calculate node output for multi-class logistic regression.
+     */
+    class LKNodeOutput implements RegressionTree.NodeOutput {
+
+        /**
+         * Responses to fit.
+         */
+        double[] y;
+        /**
+         * Constructor.
+         * @param response response to fit.
+         */
+        public LKNodeOutput(double[] response) {
+            this.y = response;
+        }
+        
+        @Override
+        public double calculate(int[] samples) {
+            int n = 0;
+            double nu = 0.0;
+            double de = 0.0;
+            for (int i = 0; i < samples.length; i++) {
+                if (samples[i] > 0) {
+                    n++;
+                    double abs = Math.abs(y[i]);
+                    nu += y[i];
+                    de += abs * (1.0 - abs);
+                }
+            }
+            
+            if (de < 1E-10) {
+                return nu / n;
+            }
+            
+            return ((k-1.0) / k) * (nu / de);
+        }        
+    }
+    private static final long serialVersionUID = 1L;
     /**
      * The number of classes.
      */
@@ -129,170 +316,22 @@ public class GradientTreeBoost implements SoftClassifier<double[]>, Serializable
      * The shrinkage parameter in (0, 1] controls the learning rate of procedure.
      */
     private double shrinkage = 0.005;
+    
     /**
      * The number of leaves in each tree.
      */
     private int maxNodes = 6;
+    
     /**
      * The number of trees.
      */
     private int ntrees = 500;
+    
     /**
      * The sampling rate for stochastic tree boosting.
      */
     private double subsample = 0.7;
-    
-    /**
-     * Trainer for GradientTreeBoost classifiers.
-     */
-    public static class Trainer extends ClassifierTrainer<double[]> {
-        /**
-         * The number of trees.
-         */
-        private int ntrees = 500;
-        /**
-         * The shrinkage parameter in (0, 1] controls the learning rate of procedure.
-         */
-        private double shrinkage = 0.005;
-        /**
-         * The number of leaves in each tree.
-         */
-        private int maxNodes = 6;
-        /**
-         * The sampling rate for stochastic tree boosting.
-         */
-        private double subsample = 0.7;
 
-        /**
-         * Default constructor of 500 trees.
-         */
-        public Trainer() {
-
-        }
-
-        /**
-         * Constructor.
-         * 
-         * @param ntrees the number of trees.
-         */
-        public Trainer(int ntrees) {
-            if (ntrees < 1) {
-                throw new IllegalArgumentException("Invalid number of trees: " + ntrees);
-            }
-
-            this.ntrees = ntrees;
-        }
-
-        /**
-         * Constructor.
-         * 
-         * @param attributes the attributes of independent variable.
-         * @param ntrees the number of trees.
-         */
-        public Trainer(Attribute[] attributes, int ntrees) {
-            super(attributes);
-
-            if (ntrees < 1) {
-                throw new IllegalArgumentException("Invalid number of trees: " + ntrees);
-            }
-
-            this.ntrees = ntrees;
-        }
-        
-        /**
-         * Sets the number of trees in the random forest.
-         * @param ntrees the number of trees.
-         */
-        public Trainer setNumTrees(int ntrees) {
-            if (ntrees < 1) {
-                throw new IllegalArgumentException("Invalid number of trees: " + ntrees);
-            }
-
-            this.ntrees = ntrees;
-            return this;
-        }
-        
-        /**
-         * Sets the maximum number of leaf nodes in the tree.
-         * @param maxNodes the maximum number of leaf nodes in the tree.
-         */
-        public Trainer setMaxNodes(int maxNodes) {
-            if (maxNodes < 2) {
-                throw new IllegalArgumentException("Invalid maximum number of leaf nodes: " + maxNodes);
-            }
-            
-            this.maxNodes = maxNodes;
-            return this;
-        }
-        
-        /**
-         * Sets the shrinkage parameter in (0, 1] controls the learning rate of procedure.
-         * @param shrinkage the learning rate.
-         */
-        public Trainer setShrinkage(double shrinkage) {
-            if (shrinkage <= 0 || shrinkage > 1) {
-                throw new IllegalArgumentException("Invalid shrinkage: " + shrinkage);
-            }
-
-            this.shrinkage = shrinkage;
-            return this;
-        }
-
-        /**
-         * Sets the sampling rate for stochastic tree boosting.
-         * @param subsample the sampling rate for stochastic tree boosting.
-         */
-        public Trainer setSamplingRates(double subsample) {
-            if (subsample <= 0 || subsample > 1) {
-                throw new IllegalArgumentException("Invalid sampling fraction: " + subsample);
-            }
-
-            this.subsample = subsample;
-            return this;
-        }
-        
-        @Override
-        public GradientTreeBoost train(double[][] x, int[] y) {
-            return new GradientTreeBoost(attributes, x, y, ntrees, maxNodes, shrinkage, subsample);
-        }
-    }
-    
-    /**
-     * Constructor. Learns a gradient tree boosting for classification.
-     * @param x the training instances. 
-     * @param y the class labels.
-     * @param ntrees the number of iterations (trees).
-     */
-    public GradientTreeBoost(double[][] x, int[] y, int ntrees) {
-        this(null, x, y, ntrees);
-    }
-    
-    /**
-     * Constructor. Learns a gradient tree boosting for classification.
-     *
-     * @param x the training instances. 
-     * @param y the class labels.
-     * @param ntrees the number of iterations (trees).
-     * @param maxNodes the number of leaves in each tree.
-     * @param shrinkage the shrinkage parameter in (0, 1] controls the learning rate of procedure.
-     * @param f the sampling rate for stochastic tree boosting.
-     */
-    public GradientTreeBoost(double[][] x, int[] y, int ntrees, int maxNodes, double shrinkage, double f) {
-        this(null, x, y, ntrees, maxNodes, shrinkage, f);
-    }
-
-    /**
-     * Constructor. Learns a gradient tree boosting for classification.
-     * 
-     * @param attributes the attribute properties.
-     * @param x the training instances. 
-     * @param y the class labels.
-     * @param ntrees the number of iterations (trees).
-     */
-    public GradientTreeBoost(Attribute[] attributes, double[][] x, int[] y, int ntrees) {
-        this(attributes, x, y, ntrees, 6, x.length < 2000 ? 0.005 : 0.05, 0.7);
-    }
-    
     /**
      * Constructor. Learns a gradient tree boosting for classification.
      *
@@ -304,7 +343,8 @@ public class GradientTreeBoost implements SoftClassifier<double[]>, Serializable
      * @param shrinkage the shrinkage parameter in (0, 1] controls the learning rate of procedure.
      * @param subsample the sampling fraction for stochastic tree boosting.
      */
-    public GradientTreeBoost(Attribute[] attributes, double[][] x, int[] y, int ntrees, int maxNodes, double shrinkage, double subsample) {
+    public GradientTreeBoost(Attribute[] attributes, double[][] x, int[] y, int ntrees, int maxNodes, double shrinkage, double subsample, TrainingInterrupt interrupt) {
+        super(interrupt);
         if (x.length != y.length) {
             throw new IllegalArgumentException(String.format("The sizes of X and Y don't match: %d != %d", x.length, y.length));
         }
@@ -364,6 +404,49 @@ public class GradientTreeBoost implements SoftClassifier<double[]>, Serializable
             }
         }
     }
+    
+    /**
+     * Constructor. Learns a gradient tree boosting for classification.
+     * 
+     * @param attributes the attribute properties.
+     * @param x the training instances. 
+     * @param y the class labels.
+     * @param ntrees the number of iterations (trees).
+     */
+    public GradientTreeBoost(Attribute[] attributes, double[][] x, int[] y, int ntrees, TrainingInterrupt interrupt) {
+        this(attributes, x, y, ntrees, 6, x.length < 2000 ? 0.005 : 0.05, 0.7, interrupt);
+    }
+
+    /**
+     * Constructor. Learns a gradient tree boosting for classification.
+     *
+     * @param x the training instances. 
+     * @param y the class labels.
+     * @param ntrees the number of iterations (trees).
+     * @param maxNodes the number of leaves in each tree.
+     * @param shrinkage the shrinkage parameter in (0, 1] controls the learning rate of procedure.
+     * @param f the sampling rate for stochastic tree boosting.
+     */
+    public GradientTreeBoost(double[][] x, int[] y, int ntrees, int maxNodes, double shrinkage, double f, TrainingInterrupt interrupt) {
+        this(null, x, y, ntrees, maxNodes, shrinkage, f, interrupt);
+    }
+    
+    /**
+     * Constructor. Learns a gradient tree boosting for classification.
+     * @param x the training instances. 
+     * @param y the class labels.
+     * @param ntrees the number of iterations (trees).
+     */
+    public GradientTreeBoost(double[][] x, int[] y, int ntrees, TrainingInterrupt interrupt) {
+        this(null, x, y, ntrees, interrupt);
+    }
+
+    /**
+     * Returns the regression trees.
+     */
+    public RegressionTree[] getTrees() {
+        return trees;
+    }
 
     /**
      * Returns the variable importance. Every time a split of a node is made
@@ -376,6 +459,220 @@ public class GradientTreeBoost implements SoftClassifier<double[]>, Serializable
      */
     public double[] importance() {
         return importance;
+    }
+    
+    
+    @Override
+    public int predict(double[] x) {
+        if (k == 2) {
+            double y = b;
+            for (int i = 0; i < ntrees; i++) {
+                y += shrinkage * trees[i].predict(x);
+            }
+            
+            return y > 0 ? 1 : 0;
+        } else {
+            double max = Double.NEGATIVE_INFINITY;
+            int y = -1;
+            for (int j = 0; j < k; j++) {
+                double yj = 0.0;
+                for (int i = 0; i < ntrees; i++) {
+                    yj += shrinkage * forest[j][i].predict(x);
+                }
+                
+                if (yj > max) {
+                    max = yj;
+                    y = j;
+                }
+            }
+
+            return y;            
+        }
+    }
+    
+    @Override
+    public int predict(double[] x, double[] posteriori) {
+        if (posteriori.length != k) {
+            throw new IllegalArgumentException(String.format("Invalid posteriori vector size: %d, expected: %d", posteriori.length, k));
+        }
+
+        if (k == 2) {
+            double y = b;
+            for (int i = 0; i < ntrees; i++) {
+                y += shrinkage * trees[i].predict(x);
+            }
+
+            posteriori[0] = 1.0 / (1.0 + Math.exp(2*y));
+            posteriori[1] = 1.0 - posteriori[0];
+
+            if (y > 0) {
+                return 1;
+            } else {
+                return 0;
+            }
+        } else {
+            double max = Double.NEGATIVE_INFINITY;
+            int y = -1;
+            for (int j = 0; j < k; j++) {
+                posteriori[j] = 0.0;
+                
+                for (int i = 0; i < ntrees; i++) {
+                    posteriori[j] += shrinkage * forest[j][i].predict(x);
+                }
+                
+                if (posteriori[j] > max) {
+                    max = posteriori[j];
+                    y = j;
+                }
+            }
+
+            double Z = 0.0;
+            for (int i = 0; i < k; i++) {
+                posteriori[i] = Math.exp(posteriori[i] - max);
+                Z += posteriori[i];
+            }
+
+            for (int i = 0; i < k; i++) {
+                posteriori[i] /= Z;
+            }
+            
+            return y;            
+        }
+    }
+    
+    /**
+     * Returns the number of trees in the model.
+     * 
+     * @return the number of trees in the model 
+     */
+    public int size() {
+        return trees.length;
+    }
+    
+    /**
+     * Test the model on a validation dataset.
+     * 
+     * @param x the test data set.
+     * @param y the test data response values.
+     * @return accuracies with first 1, 2, ..., decision trees.
+     */
+    public double[] test(double[][] x, int[] y) {
+        double[] accuracy = new double[ntrees];
+
+        int n = x.length;
+        int[] label = new int[n];
+
+        Accuracy measure = new Accuracy();
+        
+        if (k == 2) {
+            double[] prediction = new double[n];
+            Arrays.fill(prediction, b);
+            for (int i = 0; i < ntrees; i++) {
+                for (int j = 0; j < n; j++) {
+                    prediction[j] += shrinkage * trees[i].predict(x[j]);
+                    label[j] = prediction[j] > 0 ? 1 : 0;
+                }
+                accuracy[i] = measure.measure(y, label);
+            }
+        } else {
+            double[][] prediction = new double[n][k];
+            for (int i = 0; i < ntrees; i++) {
+                for (int j = 0; j < n; j++) {
+                    for (int l = 0; l < k; l++) {
+                        prediction[j][l] += shrinkage * forest[l][i].predict(x[j]);
+                    }
+                    label[j] = Math.whichMax(prediction[j]);
+                }
+
+                accuracy[i] = measure.measure(y, label);
+            }
+        }
+        
+        return accuracy;
+    }
+    
+    /**
+     * Test the model on a validation dataset.
+     * 
+     * @param x the test data set.
+     * @param y the test data labels.
+     * @param measures the performance measures of classification.
+     * @return performance measures with first 1, 2, ..., decision trees.
+     */
+    public double[][] test(double[][] x, int[] y, ClassificationMeasure[] measures) {
+        int m = measures.length;
+        double[][] results = new double[ntrees][m];
+
+        int n = x.length;
+        int[] label = new int[n];
+
+        if (k == 2) {
+            double[] prediction = new double[n];
+            Arrays.fill(prediction, b);
+            for (int i = 0; i < ntrees; i++) {
+                for (int j = 0; j < n; j++) {
+                    prediction[j] += shrinkage * trees[i].predict(x[j]);
+                    label[j] = prediction[j] > 0 ? 1 : 0;
+                }
+
+                for (int j = 0; j < m; j++) {
+                    results[i][j] = measures[j].measure(y, label);
+                }
+            }
+        } else {
+            double[][] prediction = new double[n][k];
+            for (int i = 0; i < ntrees; i++) {
+                for (int j = 0; j < n; j++) {
+                    for (int l = 0; l < k; l++) {
+                        prediction[j][l] += shrinkage * forest[l][i].predict(x[j]);
+                    }
+                    label[j] = Math.whichMax(prediction[j]);
+                }
+
+                for (int j = 0; j < m; j++) {
+                    results[i][j] = measures[j].measure(y, label);
+                }
+            }
+
+        }
+        
+        return results;
+    }
+    
+    /**
+     * Trims the tree model set to a smaller size in case of over-fitting.
+     * Or if extra decision trees in the model don't improve the performance,
+     * we may remove them to reduce the model size and also improve the speed of
+     * prediction.
+     * 
+     * @param ntrees the new (smaller) size of tree model set.
+     */
+    public void trim(int ntrees) {
+        if (ntrees < 1) {
+            throw new IllegalArgumentException("Invalid new model size: " + ntrees);
+        }
+
+        if (k == 2) {
+            if (ntrees > trees.length) {
+                throw new IllegalArgumentException("The new model size is larger than the current size.");
+            }
+
+            if (ntrees < trees.length) {
+                trees = Arrays.copyOf(trees, ntrees);
+                this.ntrees = ntrees;
+            }
+        } else {
+            if (ntrees > forest[0].length) {
+                throw new IllegalArgumentException("The new model size is larger than the current one.");
+            }
+
+            if (ntrees < forest[0].length) {
+                for (int i = 0; i < forest.length; i++) {
+                    forest[i] = Arrays.copyOf(forest[i], ntrees);
+                }
+                this.ntrees = ntrees;
+            }
+        }
     }
     
     /**
@@ -525,298 +822,5 @@ public class GradientTreeBoost implements SoftClassifier<double[]>, Serializable
                 }
             }
         }
-    }
-
-    /**
-     * Class to calculate node output for two-class logistic regression.
-     */
-    class L2NodeOutput implements RegressionTree.NodeOutput {
-
-        /**
-         * Pseudo response to fit.
-         */
-        double[] y;
-        /**
-         * Constructor.
-         * @param y pseudo response to fit.
-         */
-        public L2NodeOutput(double[] y) {
-            this.y = y;
-        }
-        
-        @Override
-        public double calculate(int[] samples) {
-            double nu = 0.0;
-            double de = 0.0;
-            for (int i = 0; i < samples.length; i++) {
-                if (samples[i] > 0) {
-                    double abs = Math.abs(y[i]);
-                    nu += y[i];
-                    de += abs * (2.0 - abs);
-                }
-            }
-            
-            return nu / de;
-        }        
-    }
-    
-    
-    /**
-     * Class to calculate node output for multi-class logistic regression.
-     */
-    class LKNodeOutput implements RegressionTree.NodeOutput {
-
-        /**
-         * Responses to fit.
-         */
-        double[] y;
-        /**
-         * Constructor.
-         * @param response response to fit.
-         */
-        public LKNodeOutput(double[] response) {
-            this.y = response;
-        }
-        
-        @Override
-        public double calculate(int[] samples) {
-            int n = 0;
-            double nu = 0.0;
-            double de = 0.0;
-            for (int i = 0; i < samples.length; i++) {
-                if (samples[i] > 0) {
-                    n++;
-                    double abs = Math.abs(y[i]);
-                    nu += y[i];
-                    de += abs * (1.0 - abs);
-                }
-            }
-            
-            if (de < 1E-10) {
-                return nu / n;
-            }
-            
-            return ((k-1.0) / k) * (nu / de);
-        }        
-    }
-    
-    /**
-     * Returns the number of trees in the model.
-     * 
-     * @return the number of trees in the model 
-     */
-    public int size() {
-        return trees.length;
-    }
-    
-    /**
-     * Trims the tree model set to a smaller size in case of over-fitting.
-     * Or if extra decision trees in the model don't improve the performance,
-     * we may remove them to reduce the model size and also improve the speed of
-     * prediction.
-     * 
-     * @param ntrees the new (smaller) size of tree model set.
-     */
-    public void trim(int ntrees) {
-        if (ntrees < 1) {
-            throw new IllegalArgumentException("Invalid new model size: " + ntrees);
-        }
-
-        if (k == 2) {
-            if (ntrees > trees.length) {
-                throw new IllegalArgumentException("The new model size is larger than the current size.");
-            }
-
-            if (ntrees < trees.length) {
-                trees = Arrays.copyOf(trees, ntrees);
-                this.ntrees = ntrees;
-            }
-        } else {
-            if (ntrees > forest[0].length) {
-                throw new IllegalArgumentException("The new model size is larger than the current one.");
-            }
-
-            if (ntrees < forest[0].length) {
-                for (int i = 0; i < forest.length; i++) {
-                    forest[i] = Arrays.copyOf(forest[i], ntrees);
-                }
-                this.ntrees = ntrees;
-            }
-        }
-    }
-    
-    @Override
-    public int predict(double[] x) {
-        if (k == 2) {
-            double y = b;
-            for (int i = 0; i < ntrees; i++) {
-                y += shrinkage * trees[i].predict(x);
-            }
-            
-            return y > 0 ? 1 : 0;
-        } else {
-            double max = Double.NEGATIVE_INFINITY;
-            int y = -1;
-            for (int j = 0; j < k; j++) {
-                double yj = 0.0;
-                for (int i = 0; i < ntrees; i++) {
-                    yj += shrinkage * forest[j][i].predict(x);
-                }
-                
-                if (yj > max) {
-                    max = yj;
-                    y = j;
-                }
-            }
-
-            return y;            
-        }
-    }
-    
-    @Override
-    public int predict(double[] x, double[] posteriori) {
-        if (posteriori.length != k) {
-            throw new IllegalArgumentException(String.format("Invalid posteriori vector size: %d, expected: %d", posteriori.length, k));
-        }
-
-        if (k == 2) {
-            double y = b;
-            for (int i = 0; i < ntrees; i++) {
-                y += shrinkage * trees[i].predict(x);
-            }
-
-            posteriori[0] = 1.0 / (1.0 + Math.exp(2*y));
-            posteriori[1] = 1.0 - posteriori[0];
-
-            if (y > 0) {
-                return 1;
-            } else {
-                return 0;
-            }
-        } else {
-            double max = Double.NEGATIVE_INFINITY;
-            int y = -1;
-            for (int j = 0; j < k; j++) {
-                posteriori[j] = 0.0;
-                
-                for (int i = 0; i < ntrees; i++) {
-                    posteriori[j] += shrinkage * forest[j][i].predict(x);
-                }
-                
-                if (posteriori[j] > max) {
-                    max = posteriori[j];
-                    y = j;
-                }
-            }
-
-            double Z = 0.0;
-            for (int i = 0; i < k; i++) {
-                posteriori[i] = Math.exp(posteriori[i] - max);
-                Z += posteriori[i];
-            }
-
-            for (int i = 0; i < k; i++) {
-                posteriori[i] /= Z;
-            }
-            
-            return y;            
-        }
-    }
-    
-    /**
-     * Test the model on a validation dataset.
-     * 
-     * @param x the test data set.
-     * @param y the test data response values.
-     * @return accuracies with first 1, 2, ..., decision trees.
-     */
-    public double[] test(double[][] x, int[] y) {
-        double[] accuracy = new double[ntrees];
-
-        int n = x.length;
-        int[] label = new int[n];
-
-        Accuracy measure = new Accuracy();
-        
-        if (k == 2) {
-            double[] prediction = new double[n];
-            Arrays.fill(prediction, b);
-            for (int i = 0; i < ntrees; i++) {
-                for (int j = 0; j < n; j++) {
-                    prediction[j] += shrinkage * trees[i].predict(x[j]);
-                    label[j] = prediction[j] > 0 ? 1 : 0;
-                }
-                accuracy[i] = measure.measure(y, label);
-            }
-        } else {
-            double[][] prediction = new double[n][k];
-            for (int i = 0; i < ntrees; i++) {
-                for (int j = 0; j < n; j++) {
-                    for (int l = 0; l < k; l++) {
-                        prediction[j][l] += shrinkage * forest[l][i].predict(x[j]);
-                    }
-                    label[j] = Math.whichMax(prediction[j]);
-                }
-
-                accuracy[i] = measure.measure(y, label);
-            }
-        }
-        
-        return accuracy;
-    }
-    
-    /**
-     * Test the model on a validation dataset.
-     * 
-     * @param x the test data set.
-     * @param y the test data labels.
-     * @param measures the performance measures of classification.
-     * @return performance measures with first 1, 2, ..., decision trees.
-     */
-    public double[][] test(double[][] x, int[] y, ClassificationMeasure[] measures) {
-        int m = measures.length;
-        double[][] results = new double[ntrees][m];
-
-        int n = x.length;
-        int[] label = new int[n];
-
-        if (k == 2) {
-            double[] prediction = new double[n];
-            Arrays.fill(prediction, b);
-            for (int i = 0; i < ntrees; i++) {
-                for (int j = 0; j < n; j++) {
-                    prediction[j] += shrinkage * trees[i].predict(x[j]);
-                    label[j] = prediction[j] > 0 ? 1 : 0;
-                }
-
-                for (int j = 0; j < m; j++) {
-                    results[i][j] = measures[j].measure(y, label);
-                }
-            }
-        } else {
-            double[][] prediction = new double[n][k];
-            for (int i = 0; i < ntrees; i++) {
-                for (int j = 0; j < n; j++) {
-                    for (int l = 0; l < k; l++) {
-                        prediction[j][l] += shrinkage * forest[l][i].predict(x[j]);
-                    }
-                    label[j] = Math.whichMax(prediction[j]);
-                }
-
-                for (int j = 0; j < m; j++) {
-                    results[i][j] = measures[j].measure(y, label);
-                }
-            }
-
-        }
-        
-        return results;
-    }
-
-    /**
-     * Returns the regression trees.
-     */
-    public RegressionTree[] getTrees() {
-        return trees;
     }
 }

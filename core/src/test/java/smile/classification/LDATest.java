@@ -74,7 +74,7 @@ public class LDATest {
             for (int i = 0; i < n; i++) {
                 double[][] trainx = Math.slice(x, loocv.train[i]);
                 int[] trainy = Math.slice(y, loocv.train[i]);
-                LDA lda = new LDA(trainx, trainy);
+                LDA lda = new LDA(trainx, trainy, null);
 
                 if (y[loocv.test[i]] != lda.predict(x[loocv.test[i]], posteriori))
                     error++;
@@ -106,7 +106,7 @@ public class LDATest {
             double[][] testx = test.toArray(new double[test.size()][]);
             int[] testy = test.toArray(new int[test.size()]);
             
-            LDA lda = new LDA(x, y);
+            LDA lda = new LDA(x, y, null);
             
             int error = 0;
             for (int i = 0; i < testx.length; i++) {

@@ -82,7 +82,7 @@ public class NeuralNetworkTest {
             for (int i = 0; i < n; i++) {
                 double[][] trainx = Math.slice(x, loocv.train[i]);
                 int[] trainy = Math.slice(y, loocv.train[i]);
-                NeuralNetwork net = new NeuralNetwork(NeuralNetwork.ErrorFunction.CROSS_ENTROPY, NeuralNetwork.ActivationFunction.SOFTMAX, x[0].length, 10, 3);
+                NeuralNetwork net = new NeuralNetwork(NeuralNetwork.ErrorFunction.CROSS_ENTROPY, NeuralNetwork.ActivationFunction.SOFTMAX, null, x[0].length, 10, 3);
                 for (int j = 0; j < 20; j++) {
                     net.learn(trainx, trainy);
                 }
@@ -134,7 +134,7 @@ public class NeuralNetworkTest {
             for (int i = 0; i < n; i++) {
                 double[][] trainx = Math.slice(x, loocv.train[i]);
                 int[] trainy = Math.slice(y, loocv.train[i]);
-                NeuralNetwork net = new NeuralNetwork(NeuralNetwork.ErrorFunction.CROSS_ENTROPY, NeuralNetwork.ActivationFunction.LOGISTIC_SIGMOID, x[0].length, 10, 1);
+                NeuralNetwork net = new NeuralNetwork(NeuralNetwork.ErrorFunction.CROSS_ENTROPY, NeuralNetwork.ActivationFunction.LOGISTIC_SIGMOID, null, x[0].length, 10, 1);
                 for (int j = 0; j < 30; j++) {
                     net.learn(trainx, trainy);
                 }
@@ -182,7 +182,7 @@ public class NeuralNetworkTest {
                 }
             }
 
-            NeuralNetwork net = new NeuralNetwork(NeuralNetwork.ErrorFunction.CROSS_ENTROPY, NeuralNetwork.ActivationFunction.SOFTMAX, x[0].length, 30, Math.max(y)+1);
+            NeuralNetwork net = new NeuralNetwork(NeuralNetwork.ErrorFunction.CROSS_ENTROPY, NeuralNetwork.ActivationFunction.SOFTMAX, null, x[0].length, 30, Math.max(y)+1);
             for (int j = 0; j < 20; j++) {
                 net.learn(x, y);
             }
@@ -232,7 +232,7 @@ public class NeuralNetworkTest {
                 }
             }
 
-            NeuralNetwork net = new NeuralNetwork(NeuralNetwork.ErrorFunction.LEAST_MEAN_SQUARES, NeuralNetwork.ActivationFunction.LOGISTIC_SIGMOID, x[0].length, 30, Math.max(y)+1);
+            NeuralNetwork net = new NeuralNetwork(NeuralNetwork.ErrorFunction.LEAST_MEAN_SQUARES, NeuralNetwork.ActivationFunction.LOGISTIC_SIGMOID, null, x[0].length, 30, Math.max(y)+1);
             for (int j = 0; j < 30; j++) {
                 net.learn(x, y);
             }
@@ -281,7 +281,7 @@ public class NeuralNetworkTest {
                 }
             }
 
-            NeuralNetwork net = new NeuralNetwork(NeuralNetwork.ErrorFunction.CROSS_ENTROPY, NeuralNetwork.ActivationFunction.SOFTMAX, x[0].length, 40, Math.max(y)+1);
+            NeuralNetwork net = new NeuralNetwork(NeuralNetwork.ErrorFunction.CROSS_ENTROPY, NeuralNetwork.ActivationFunction.SOFTMAX, null, x[0].length, 40, Math.max(y)+1);
             for (int j = 0; j < 30; j++) {
                 net.learn(x, y);
             }
@@ -330,7 +330,7 @@ public class NeuralNetworkTest {
                 }
             }
 
-            NeuralNetwork net = new NeuralNetwork(NeuralNetwork.ErrorFunction.LEAST_MEAN_SQUARES, NeuralNetwork.ActivationFunction.LOGISTIC_SIGMOID, x[0].length, 40, Math.max(y)+1);
+            NeuralNetwork net = new NeuralNetwork(NeuralNetwork.ErrorFunction.LEAST_MEAN_SQUARES, NeuralNetwork.ActivationFunction.LOGISTIC_SIGMOID, null, x[0].length, 40, Math.max(y)+1);
             for (int j = 0; j < 30; j++) {
                 net.learn(x, y);
             }

@@ -31,12 +31,7 @@ public abstract class ClassifierTrainer <T> {
      */
     Attribute[] attributes;
     
-    /**
-     * Constructor.
-     */
-    public ClassifierTrainer() {
-        
-    }
+    TrainingInterrupt interrupt;
     
     /**
      * Constructor.
@@ -46,6 +41,14 @@ public abstract class ClassifierTrainer <T> {
         this.attributes = attributes;
     }
     
+    /**
+     * Constructor.
+     * @param interrupt
+     */
+    public ClassifierTrainer(TrainingInterrupt interrupt) {
+        this.interrupt = interrupt;
+    }
+
     /**
      * Sets feature attributes. This is optional since most classifiers can only
      * work on real-valued attributes.
@@ -64,4 +67,14 @@ public abstract class ClassifierTrainer <T> {
      * @return a trained classifier.
      */
     public abstract Classifier<T> train(T[] x, int[] y);
+    
+    /**
+     * Checks for interrupts
+     * @throws InterruptedException 
+     */
+    protected void interrupt() throws TrainingInterruptedException {
+        if (this.interrupt != null && this.interrupt.interrupt) {
+            throw new TrainingInterruptedException();
+        }
+    }
 }

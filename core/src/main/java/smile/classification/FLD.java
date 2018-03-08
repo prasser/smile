@@ -57,37 +57,6 @@ import smile.projection.Projection;
  * @author Haifeng Li
  */
 public class FLD implements Classifier<double[]>, Projection<double[]>, Serializable {
-    private static final long serialVersionUID = 1L;
-
-    /**
-     * The dimensionality of data.
-     */
-    private final int p;
-    /**
-     * The number of classes.
-     */
-    private final int k;
-    /**
-     * Original common mean vector.
-     */
-    private final double[] mean;
-    /**
-     * Original class mean vectors.
-     */
-    private final double[][] mu;
-    /**
-     * Project matrix.
-     */
-    private final double[][] scaling;
-    /**
-     * Projected common mean vector.
-     */
-    private final double[] smean;
-    /**
-     * Projected class mean vectors.
-     */
-    private final double[][] smu;
-
     /**
      * Trainer for Fisher's linear discriminant.
      */
@@ -106,9 +75,10 @@ public class FLD implements Classifier<double[]>, Projection<double[]>, Serializ
          * Constructor. The dimensionality of mapped space will be k - 1,
          * where k is the number of classes of data. The default tolerance
          * to covariance matrix singularity is 1E-4.
+         * @param interrupt
          */
-        public Trainer() {
-
+        public Trainer(TrainingInterrupt interrupt) {
+            super(interrupt);
         }
         
         /**
@@ -145,6 +115,37 @@ public class FLD implements Classifier<double[]>, Projection<double[]>, Serializ
             return new FLD(x, y, L, tol);
         }
     }
+
+    private static final long serialVersionUID = 1L;
+    /**
+     * The dimensionality of data.
+     */
+    private final int p;
+    /**
+     * The number of classes.
+     */
+    private final int k;
+    /**
+     * Original common mean vector.
+     */
+    private final double[] mean;
+    /**
+     * Original class mean vectors.
+     */
+    private final double[][] mu;
+    /**
+     * Project matrix.
+     */
+    private final double[][] scaling;
+    /**
+     * Projected common mean vector.
+     */
+    private final double[] smean;
+
+    /**
+     * Projected class mean vectors.
+     */
+    private final double[][] smu;
     
     /**
      * Constructor. Learn Fisher's linear discriminant.
@@ -308,6 +309,14 @@ public class FLD implements Classifier<double[]>, Projection<double[]>, Serializ
         smu = Math.abmm(mu, scaling);
     }
 
+    /**
+     * Returns the projection matrix W. The dimension reduced data can be obtained
+     * by y = W' * x.
+     */
+    public double[][] getProjection() {
+        return scaling;
+    }
+
     @Override
     public int predict(double[] x) {
         if (x.length != p) {
@@ -355,13 +364,5 @@ public class FLD implements Classifier<double[]>, Projection<double[]>, Serializ
         }
         
         return y;
-    }
-
-    /**
-     * Returns the projection matrix W. The dimension reduced data can be obtained
-     * by y = W' * x.
-     */
-    public double[][] getProjection() {
-        return scaling;
     }
 }

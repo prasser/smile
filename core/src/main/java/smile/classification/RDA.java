@@ -40,40 +40,8 @@ import smile.math.matrix.EigenValueDecomposition;
  * 
  * @author Haifeng Li
  */
-public class RDA implements SoftClassifier<double[]>, Serializable {
-    private static final long serialVersionUID = 1L;
-
-    /**
-     * The dimensionality of data.
-     */
-    private int p;
-    /**
-     * The number of classes.
-     */
-    private int k;
-    /**
-     * Constant term of discriminant function of each class.
-     */
-    private final double[] ct;
-    /**
-     * A priori probabilities of each class.
-     */
-    private double[] priori;
-    /**
-     * Mean vectors of each class.
-     */
-    private double[][] mu;
-    /**
-     * Eigen vectors of each covariance matrix, which transforms observations
-     * to discriminant functions, normalized so that within groups covariance
-     * matrix is spherical.
-     */
-    private DenseMatrix[] scaling;
-    /**
-     * Eigen values of each covariance matrix.
-     */
-    private double[][] ev;
-
+public class RDA extends SoftClassifier<double[]> implements Serializable {
+    
     /**
      * Trainer for regularized discriminant analysis.
      */
@@ -99,8 +67,10 @@ public class RDA implements SoftClassifier<double[]>, Serializable {
          * 
          * @param alpha regularization factor in [0, 1] allows a continuum of
          * models between LDA and QDA.
+         * @param interrupt
          */
-        public Trainer(double alpha) {
+        public Trainer(double alpha, TrainingInterrupt interrupt) {
+            super (interrupt);
             if (alpha < 0.0 || alpha > 1.0) {
                 throw new IllegalArgumentException("Invalid regularization factor: " + alpha);
             }
@@ -134,9 +104,42 @@ public class RDA implements SoftClassifier<double[]>, Serializable {
         
         @Override
         public RDA train(double[][] x, int[] y) {
-            return new RDA(x, y, priori, alpha, tol);
+            return new RDA(x, y, priori, alpha, tol, interrupt);
         }
     }
+
+    private static final long serialVersionUID = 1L;
+    /**
+     * The dimensionality of data.
+     */
+    private int p;
+    /**
+     * The number of classes.
+     */
+    private int k;
+    /**
+     * Constant term of discriminant function of each class.
+     */
+    private final double[] ct;
+    /**
+     * A priori probabilities of each class.
+     */
+    private double[] priori;
+    /**
+     * Mean vectors of each class.
+     */
+    private double[][] mu;
+    /**
+     * Eigen vectors of each covariance matrix, which transforms observations
+     * to discriminant functions, normalized so that within groups covariance
+     * matrix is spherical.
+     */
+    private DenseMatrix[] scaling;
+
+    /**
+     * Eigen values of each covariance matrix.
+     */
+    private double[][] ev;
     
     /**
      * Constructor. Learn regularized discriminant analysis.
@@ -144,21 +147,10 @@ public class RDA implements SoftClassifier<double[]>, Serializable {
      * @param y training labels in [0, k), where k is the number of classes.
      * @param alpha regularization factor in [0, 1] allows a continuum of models
      * between LDA and QDA.
+     * @param interrupt
      */
-    public RDA(double[][] x, int[] y, double alpha) {
-        this(x, y, null, alpha);
-    }
-
-    /**
-     * Constructor. Learn regularized discriminant analysis.
-     * @param x training samples.
-     * @param y training labels in [0, k), where k is the number of classes.
-     * @param alpha regularization factor in [0, 1] allows a continuum of models
-     * between LDA and QDA.
-     * @param priori the priori probability of each class.
-     */
-    public RDA(double[][] x, int[] y, double[] priori, double alpha) {
-        this(x, y, priori, alpha, 1E-4);
+    public RDA(double[][] x, int[] y, double alpha, TrainingInterrupt interrupt) {
+        this(x, y, null, alpha, interrupt);
     }
 
     /**
@@ -170,8 +162,10 @@ public class RDA implements SoftClassifier<double[]>, Serializable {
      * @param priori the priori probability of each class.
      * @param tol tolerance to decide if a covariance matrix is singular; it
      * will reject variables whose variance is less than tol<sup>2</sup>.
+     * @param interrupt
      */
-    public RDA(double[][] x, int[] y, double[] priori, double alpha, double tol) {
+    public RDA(double[][] x, int[] y, double[] priori, double alpha, double tol, TrainingInterrupt interrupt) {
+        super(interrupt);
         if (x.length != y.length) {
             throw new IllegalArgumentException(String.format("The sizes of X and Y don't match: %d != %d", x.length, y.length));
         }
@@ -330,6 +324,19 @@ public class RDA implements SoftClassifier<double[]>, Serializable {
 
             ct[i] = Math.log(priori[i]) - 0.5 * logev;
         }
+    }
+
+    /**
+     * Constructor. Learn regularized discriminant analysis.
+     * @param x training samples.
+     * @param y training labels in [0, k), where k is the number of classes.
+     * @param alpha regularization factor in [0, 1] allows a continuum of models
+     * between LDA and QDA.
+     * @param priori the priori probability of each class.
+     * @param interrupt
+     */
+    public RDA(double[][] x, int[] y, double[] priori, double alpha, TrainingInterrupt interrupt) {
+        this(x, y, priori, alpha, 1E-4, interrupt);
     }
 
     /**

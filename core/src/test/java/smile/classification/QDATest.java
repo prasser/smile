@@ -72,7 +72,7 @@ public class QDATest {
             for (int i = 0; i < n; i++) {
                 double[][] trainx = Math.slice(x, loocv.train[i]);
                 int[] trainy = Math.slice(y, loocv.train[i]);
-                QDA qda = new QDA(trainx, trainy);
+                QDA qda = new QDA(trainx, trainy, null);
 
                 if (y[loocv.test[i]] != qda.predict(x[loocv.test[i]], posteriori))
                     error++;

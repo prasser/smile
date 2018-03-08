@@ -79,9 +79,7 @@ import smile.math.SparseArray;
  * 
  * @author Haifeng Li
  */
-public class NaiveBayes implements OnlineClassifier<double[]>, SoftClassifier<double[]>, Serializable {
-    private static final long serialVersionUID = 1L;
-
+public class NaiveBayes extends SoftClassifier<double[]> implements Serializable, OnlineClassifier<double[]> {
     /**
      * The generation models of naive Bayes classifier.
      * For document classification in NLP, there are two different ways we can set
@@ -113,6 +111,124 @@ public class NaiveBayes implements OnlineClassifier<double[]>, SoftClassifier<do
         BERNOULLI
     }
 
+    /**
+     * Trainer for naive Bayes classifier for document classification.
+     */
+    public static class Trainer extends ClassifierTrainer<double[]> {
+
+        /**
+         * The generation model of naive Bayes.
+         */
+        private Model model;
+        /**
+         * The number of classes.
+         */
+        private int k;
+        /**
+         * The number of independent variables.
+         */
+        private int p;
+        /**
+         * A priori probabilities of each class.
+         */
+        private double[] priori;
+        /**
+         * Amount of add-k smoothing of evidence.
+         */
+        private double sigma = 1.0;
+
+        /**
+         * Constructor.
+         * 
+         * @param model the generation model of naive Bayes classifier.
+         * @param priori a priori probabilities of each class.
+         * @param p the dimensionality of input space.
+         * @param interrupt
+         */
+        public Trainer(Model model, double[] priori, int p, TrainingInterrupt interrupt) {
+            super(interrupt);
+            if (p <= 0) {
+                throw new IllegalArgumentException("Invalid dimension: " + p);
+            }
+
+            if (priori.length < 2) {
+                throw new IllegalArgumentException("Invalid number of classes: " + priori.length);
+            }
+
+            double sum = 0.0;
+            for (double prob : priori) {
+                if (prob <= 0.0 || prob >= 1.0) {
+                    throw new IllegalArgumentException("Invalid priori probability: " + prob);
+                }
+                sum += prob;
+            }
+            
+            if (Math.abs(sum - 1.0) > 1E-10) {
+                throw new IllegalArgumentException("The sum of priori probabilities is not one: " + sum);                
+            }
+
+            this.model = model;
+            this.priori = priori;
+            this.k = priori.length;
+            this.p = p;
+        }
+        
+        /**
+         * Constructor.
+         * 
+         * @param model the generation model of naive Bayes classifier.
+         * @param k the number of classes.
+         * @param p the dimensionality of input space.
+         * @param interrupt
+         */
+        public Trainer(Model model, int k, int p, TrainingInterrupt interrupt) {
+            super(interrupt);
+            if (k < 2) {
+                throw new IllegalArgumentException("Invalid number of classes: " + k);
+            }
+
+            if (p <= 0) {
+                throw new IllegalArgumentException("Invalid dimension: " + p);
+            }
+
+            this.model = model;
+            this.k = k;
+            this.p = p;
+        }
+        
+        /**
+         * Sets a priori probabilities of each class.
+         * 
+         * @param priori a priori probabilities of each class.
+         */
+        public Trainer setPriori(double[] priori) {
+            this.priori = priori;
+            return this;
+        }
+        
+        /**
+         * Sets add-k prior count of terms for smoothing.
+         * 
+         * @param sigma the prior count of add-k smoothing of evidence.
+         */
+        public Trainer setSmooth(double sigma) {
+            if (sigma < 0) {
+                throw new IllegalArgumentException("Invalid add-k smoothing parameter: " + sigma);
+            }
+
+            this.sigma = sigma;
+            return this;
+        }
+        
+        @Override
+        public NaiveBayes train(double[][] x, int[] y) {
+            NaiveBayes bayes = priori == null ? new NaiveBayes(model, k, p, sigma, interrupt) : new NaiveBayes(model, priori, p, sigma, interrupt);
+            bayes.learn(x, y);
+            return bayes;
+        }
+    }
+
+    private static final long serialVersionUID = 1L;
     /**
      * Fudge to keep nonzero.
      */
@@ -165,123 +281,11 @@ public class NaiveBayes implements OnlineClassifier<double[]>, SoftClassifier<do
      * The number of each term in each class.
      */
     private int[][] ntc;
+
     /**
      * The log conditional probabilities for document classification.
      */
     private double[][] condprob;
-
-    /**
-     * Trainer for naive Bayes classifier for document classification.
-     */
-    public static class Trainer extends ClassifierTrainer<double[]> {
-
-        /**
-         * The generation model of naive Bayes.
-         */
-        private Model model;
-        /**
-         * The number of classes.
-         */
-        private int k;
-        /**
-         * The number of independent variables.
-         */
-        private int p;
-        /**
-         * A priori probabilities of each class.
-         */
-        private double[] priori;
-        /**
-         * Amount of add-k smoothing of evidence.
-         */
-        private double sigma = 1.0;
-
-        /**
-         * Constructor.
-         * 
-         * @param model the generation model of naive Bayes classifier.
-         * @param k the number of classes.
-         * @param p the dimensionality of input space.
-         */
-        public Trainer(Model model, int k, int p) {
-            if (k < 2) {
-                throw new IllegalArgumentException("Invalid number of classes: " + k);
-            }
-
-            if (p <= 0) {
-                throw new IllegalArgumentException("Invalid dimension: " + p);
-            }
-
-            this.model = model;
-            this.k = k;
-            this.p = p;
-        }
-        
-        /**
-         * Constructor.
-         * 
-         * @param model the generation model of naive Bayes classifier.
-         * @param priori a priori probabilities of each class.
-         * @param p the dimensionality of input space.
-         */
-        public Trainer(Model model, double[] priori, int p) {
-            if (p <= 0) {
-                throw new IllegalArgumentException("Invalid dimension: " + p);
-            }
-
-            if (priori.length < 2) {
-                throw new IllegalArgumentException("Invalid number of classes: " + priori.length);
-            }
-
-            double sum = 0.0;
-            for (double prob : priori) {
-                if (prob <= 0.0 || prob >= 1.0) {
-                    throw new IllegalArgumentException("Invalid priori probability: " + prob);
-                }
-                sum += prob;
-            }
-            
-            if (Math.abs(sum - 1.0) > 1E-10) {
-                throw new IllegalArgumentException("The sum of priori probabilities is not one: " + sum);                
-            }
-
-            this.model = model;
-            this.priori = priori;
-            this.k = priori.length;
-            this.p = p;
-        }
-        
-        /**
-         * Sets a priori probabilities of each class.
-         * 
-         * @param priori a priori probabilities of each class.
-         */
-        public Trainer setPriori(double[] priori) {
-            this.priori = priori;
-            return this;
-        }
-        
-        /**
-         * Sets add-k prior count of terms for smoothing.
-         * 
-         * @param sigma the prior count of add-k smoothing of evidence.
-         */
-        public Trainer setSmooth(double sigma) {
-            if (sigma < 0) {
-                throw new IllegalArgumentException("Invalid add-k smoothing parameter: " + sigma);
-            }
-
-            this.sigma = sigma;
-            return this;
-        }
-        
-        @Override
-        public NaiveBayes train(double[][] x, int[] y) {
-            NaiveBayes bayes = priori == null ? new NaiveBayes(model, k, p, sigma) : new NaiveBayes(model, priori, p, sigma);
-            bayes.learn(x, y);
-            return bayes;
-        }
-    }
     
     /**
      * Constructor of general naive Bayes classifier.
@@ -290,8 +294,10 @@ public class NaiveBayes implements OnlineClassifier<double[]>, SoftClassifier<do
      * @param condprob the conditional distribution of each variable in
      * each class. In particular, condprob[i][j] is the conditional
      * distribution P(x<sub>j</sub> | class i).
+     * @param interrupt
      */
-    public NaiveBayes(double[] priori, Distribution[][] condprob) {
+    public NaiveBayes(double[] priori, Distribution[][] condprob, TrainingInterrupt interrupt) {
+        super(interrupt);
         if (priori.length != condprob.length) {
             throw new IllegalArgumentException("The number of priori probabilities and that of the classes are not same.");
         }
@@ -318,83 +324,16 @@ public class NaiveBayes implements OnlineClassifier<double[]>, SoftClassifier<do
 
     /**
      * Constructor of naive Bayes classifier for document classification.
-     * The priori probability of each class will be learned from data.
-     * By default, we use add-one/Laplace smoothing, which simply adds one
-     * to each count to eliminate zeros. Add-one smoothing can be interpreted
-     * as a uniform prior (each term occurs once for each class) that is
-     * then updated as evidence from the training data comes in.
-     * 
-     * @param model the generation model of naive Bayes classifier.
-     * @param k the number of classes.
-     * @param p the dimensionality of input space.
-     */
-    public NaiveBayes(Model model, int k, int p) {
-        this(model, k, p, 1.0);
-    }
-
-    /**
-     * Constructor of naive Bayes classifier for document classification.
-     * The priori probability of each class will be learned from data.
-     * Add-k smoothing.
-     * 
-     * @param model the generation model of naive Bayes classifier.
-     * @param k the number of classes.
-     * @param p the dimensionality of input space.
-     * @param sigma the prior count of add-k smoothing of evidence.
-     */
-    public NaiveBayes(Model model, int k, int p, double sigma) {
-        if (k < 2) {
-            throw new IllegalArgumentException("Invalid number of classes: " + k);
-        }
-
-        if (p <= 0) {
-            throw new IllegalArgumentException("Invalid dimension: " + p);
-        }
-
-        if (sigma < 0) {
-            throw new IllegalArgumentException("Invalid add-k smoothing parameter: " + sigma);
-        }
-
-        this.model = model;
-        this.k = k;
-        this.p = p;
-        this.sigma = sigma;
-
-        predefinedPriori = false;
-        priori = new double[k];
-
-        n = 0;
-        nc = new int[k];
-        nt = new int[k];
-        ntc = new int[k][p];
-        condprob = new double[k][p];
-    }
-
-    /**
-     * Constructor of naive Bayes classifier for document classification.
-     * By default, we use add-one/Laplace smoothing, which simply adds one
-     * to each count to eliminate zeros. Add-one smoothing can be interpreted
-     * as a uniform prior (each term occurs once for each class) that is
-     * then updated as evidence from the training data comes in.
-     * 
-     * @param model the generation model of naive Bayes classifier.
-     * @param priori the priori probability of each class.
-     * @param p the dimensionality of input space.
-     */
-    public NaiveBayes(Model model, double[] priori, int p) {
-        this(model, priori, p, 1.0);
-    }
-
-    /**
-     * Constructor of naive Bayes classifier for document classification.
      * Add-k smoothing.
      * 
      * @param model the generation model of naive Bayes classifier.
      * @param priori the priori probability of each class.
      * @param p the dimensionality of input space.
      * @param sigma the prior count of add-k smoothing of evidence.
+     * @param interrupt
      */
-    public NaiveBayes(Model model, double[] priori, int p, double sigma) {
+    public NaiveBayes(Model model, double[] priori, int p, double sigma, TrainingInterrupt interrupt) {
+        super(interrupt);
         if (p <= 0) {
             throw new IllegalArgumentException("Invalid dimension: " + p);
         }
@@ -448,6 +387,77 @@ public class NaiveBayes implements OnlineClassifier<double[]>, SoftClassifier<do
     }
 
     /**
+     * Constructor of naive Bayes classifier for document classification.
+     * By default, we use add-one/Laplace smoothing, which simply adds one
+     * to each count to eliminate zeros. Add-one smoothing can be interpreted
+     * as a uniform prior (each term occurs once for each class) that is
+     * then updated as evidence from the training data comes in.
+     * 
+     * @param model the generation model of naive Bayes classifier.
+     * @param priori the priori probability of each class.
+     * @param p the dimensionality of input space.
+     * @param interrupt
+     */
+    public NaiveBayes(Model model, double[] priori, int p, TrainingInterrupt interrupt) {
+        this(model, priori, p, 1.0, interrupt);
+    }
+
+    /**
+     * Constructor of naive Bayes classifier for document classification.
+     * The priori probability of each class will be learned from data.
+     * Add-k smoothing.
+     * 
+     * @param model the generation model of naive Bayes classifier.
+     * @param k the number of classes.
+     * @param p the dimensionality of input space.
+     * @param sigma the prior count of add-k smoothing of evidence.
+     */
+    public NaiveBayes(Model model, int k, int p, double sigma, TrainingInterrupt interrupt) {
+        super(interrupt);
+        if (k < 2) {
+            throw new IllegalArgumentException("Invalid number of classes: " + k);
+        }
+
+        if (p <= 0) {
+            throw new IllegalArgumentException("Invalid dimension: " + p);
+        }
+
+        if (sigma < 0) {
+            throw new IllegalArgumentException("Invalid add-k smoothing parameter: " + sigma);
+        }
+
+        this.model = model;
+        this.k = k;
+        this.p = p;
+        this.sigma = sigma;
+
+        predefinedPriori = false;
+        priori = new double[k];
+
+        n = 0;
+        nc = new int[k];
+        nt = new int[k];
+        ntc = new int[k][p];
+        condprob = new double[k][p];
+    }
+
+    /**
+     * Constructor of naive Bayes classifier for document classification.
+     * The priori probability of each class will be learned from data.
+     * By default, we use add-one/Laplace smoothing, which simply adds one
+     * to each count to eliminate zeros. Add-one smoothing can be interpreted
+     * as a uniform prior (each term occurs once for each class) that is
+     * then updated as evidence from the training data comes in.
+     * 
+     * @param model the generation model of naive Bayes classifier.
+     * @param k the number of classes.
+     * @param p the dimensionality of input space.
+     */
+    public NaiveBayes(Model model, int k, int p, TrainingInterrupt interrupt) {
+        this(model, k, p, 1.0, interrupt);
+    }
+
+    /**
      * Returns a priori probabilities.
      */
     public double[] getPriori() {
@@ -481,37 +491,6 @@ public class NaiveBayes implements OnlineClassifier<double[]>, SoftClassifier<do
             for (int i = 0; i < p; i++) {
                 if (x[i] > 0) {
                     ntc[y][i]++;
-                }
-            }
-        }
-
-        n++;
-        nc[y]++;
-        update();
-    }
-
-    /**
-     * Online learning of naive Bayes classifier on a sequence,
-     * which is modeled as a bag of words. Note that this method is NOT
-     * applicable for naive Bayes classifier with general generation model.
-     *
-     * @param x training instance in sparse format.
-     * @param y training label in [0, k), where k is the number of classes.
-     */
-    public void learn(SparseArray x, int y) {
-        if (model == Model.GENERAL) {
-            throw new UnsupportedOperationException("General-mode Naive Bayes classifier doesn't support online learning.");
-        }
-
-        if (model == Model.MULTINOMIAL) {
-            for (SparseArray.Entry e : x) {
-                ntc[y][e.i] += e.x;
-                nt[y] += e.x;
-            }
-        } else {
-            for (SparseArray.Entry e : x) {
-                if (e.x > 0) {
-                    ntc[y][e.i]++;
                 }
             }
         }
@@ -569,28 +548,34 @@ public class NaiveBayes implements OnlineClassifier<double[]>, SoftClassifier<do
     }
 
     /**
-     * Update conditional probabilities.
+     * Online learning of naive Bayes classifier on a sequence,
+     * which is modeled as a bag of words. Note that this method is NOT
+     * applicable for naive Bayes classifier with general generation model.
+     *
+     * @param x training instance in sparse format.
+     * @param y training label in [0, k), where k is the number of classes.
      */
-    private void update() {
-        if (!predefinedPriori) {
-            for (int c = 0; c < k; c++) {
-                priori[c] = (nc[c] + EPSILON) / (n + k * EPSILON);
-            }
+    public void learn(SparseArray x, int y) {
+        if (model == Model.GENERAL) {
+            throw new UnsupportedOperationException("General-mode Naive Bayes classifier doesn't support online learning.");
         }
 
         if (model == Model.MULTINOMIAL) {
-            for (int c = 0; c < k; c++) {
-                for (int t = 0; t < p; t++) {
-                    condprob[c][t] = (ntc[c][t] + sigma) / (nt[c] + sigma * p);
-                }
+            for (SparseArray.Entry e : x) {
+                ntc[y][e.i] += e.x;
+                nt[y] += e.x;
             }
         } else {
-            for (int c = 0; c < k; c++) {
-                for (int t = 0; t < p; t++) {
-                    condprob[c][t] = (ntc[c][t] + sigma) / (nc[c] + sigma * 2);
+            for (SparseArray.Entry e : x) {
+                if (e.x > 0) {
+                    ntc[y][e.i]++;
                 }
             }
         }
+
+        n++;
+        nc[y]++;
+        update();
     }
 
     /**
@@ -751,5 +736,30 @@ public class NaiveBayes implements OnlineClassifier<double[]>, SoftClassifier<do
         }
 
         return label;
+    }
+
+    /**
+     * Update conditional probabilities.
+     */
+    private void update() {
+        if (!predefinedPriori) {
+            for (int c = 0; c < k; c++) {
+                priori[c] = (nc[c] + EPSILON) / (n + k * EPSILON);
+            }
+        }
+
+        if (model == Model.MULTINOMIAL) {
+            for (int c = 0; c < k; c++) {
+                for (int t = 0; t < p; t++) {
+                    condprob[c][t] = (ntc[c][t] + sigma) / (nt[c] + sigma * p);
+                }
+            }
+        } else {
+            for (int c = 0; c < k; c++) {
+                for (int t = 0; t < p; t++) {
+                    condprob[c][t] = (ntc[c][t] + sigma) / (nc[c] + sigma * 2);
+                }
+            }
+        }
     }
 }

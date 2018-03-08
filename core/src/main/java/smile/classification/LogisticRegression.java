@@ -75,9 +75,674 @@ import smile.util.MulticoreExecutor;
  * 
  * @author Haifeng Li
  */
-public class LogisticRegression implements SoftClassifier<double[]>, Serializable {
+public class LogisticRegression extends SoftClassifier<double[]> implements Serializable {
+    /**
+     * Trainer for logistic regression.
+     */
+    public static class Trainer extends ClassifierTrainer<double[]> {
+
+        /**
+         * Regularization factor. &lambda; > 0 gives a "regularized" estimate
+         * of linear weights which often has superior generalization
+         * performance, especially when the dimensionality is high.
+         */
+        private double lambda = 0.0;
+        /**
+         * The tolerance for BFGS stopping iterations.
+         */
+        private double tol = 1E-5;
+        /**
+         * The maximum number of BFGS iterations.
+         */
+        private int maxIter = 500;
+
+        /**
+         * Constructor.
+         * @param interrupt
+         */
+        public Trainer(TrainingInterrupt interrupt) {
+            super(interrupt);
+        }
+        
+        /**
+         * Sets the maximum number of iterations.
+         * 
+         * @param maxIter the maximum number of iterations.
+         */
+        public Trainer setMaxNumIteration(int maxIter) {
+            if (maxIter <= 0) {
+                throw new IllegalArgumentException("Invalid maximum number of iterations: " + maxIter);
+            }
+
+            this.maxIter = maxIter;
+            return this;
+        }
+        
+        /**
+         * Sets the regularization factor. &lambda; &gt; 0 gives a "regularized"
+         * estimate of linear weights which often has superior generalization
+         * performance, especially when the dimensionality is high.
+         * 
+         * @param lambda regularization factor.
+         */
+        public Trainer setRegularizationFactor(double lambda) {
+            this.lambda = lambda;
+            return this;
+        }
+
+        /**
+         * Sets the tolerance for BFGS stopping iterations.
+         * 
+         * @param tol the tolerance for stopping iterations.
+         */
+        public Trainer setTolerance(double tol) {
+            if (tol <= 0.0) {
+                throw new IllegalArgumentException("Invalid tolerance: " + tol);
+            }
+
+            this.tol = tol;
+            return this;
+        }
+        
+        @Override
+        public LogisticRegression train(double[][] x, int[] y) {
+            return new LogisticRegression(x, y, lambda, tol, maxIter, interrupt);
+        }
+    }
+    /**
+     * Binary-class logistic regression objective function.
+     */
+    static class BinaryObjectiveFunction implements DifferentiableMultivariateFunction {
+
+        /**
+         * Task to calculate the objective function.
+         */
+        class FTask implements Callable<Double> {
+
+            /**
+             * The parameter vector.
+             */
+            double[] w;
+            /**
+             * The start index of data portion for this task.
+             */
+            int start;
+            /**
+             * The end index of data portion for this task.
+             */
+            int end;
+
+            FTask(int start, int end) {
+                this.start = start;
+                this.end = end;
+            }
+
+            @Override
+            public Double call() {
+                double f = 0.0;
+                for (int i = start; i < end; i++) {
+                    double wx = dot(x[i], w);
+                    f += log1pe(wx) - y[i] * wx;
+                }
+                return f;
+            }
+        }
+        /**
+         * Task to calculate the objective function and gradient.
+         */
+        class GTask implements Callable<double[]> {
+
+            /**
+             * The parameter vector.
+             */
+            double[] w;
+            /**
+             * The start index of data portion for this task.
+             */
+            int start;
+            /**
+             * The end index of data portion for this task.
+             */
+            int end;
+
+            GTask(int start, int end) {
+                this.start = start;
+                this.end = end;
+            }
+
+            @Override
+            public double[] call() {
+                double f = 0.0;
+                int p = w.length - 1;
+                double[] g = new double[w.length + 1];
+                
+                for (int i = start; i < end; i++) {
+                    double wx = dot(x[i], w);
+                    f += log1pe(wx) - y[i] * wx;
+                    
+                    double yi = y[i] - Math.logistic(wx);
+                    for (int j = 0; j < p; j++) {
+                        g[j] -= yi * x[i][j];
+                    }
+                    g[p] -= yi;
+                }
+                
+                g[w.length] = f;
+                return g;
+            }
+        }
+        /**
+         * Training instances.
+         */
+        double[][] x;
+        /**
+         * Training labels.
+         */
+        int[] y;
+        /**
+         * Regularization factor.
+         */
+        double lambda;
+        
+        /**
+         * Parallel computing of objective function.
+         */
+        List<FTask> ftasks = null;
+
+        /**
+         * Parallel computing of objective function and gradient.
+         */
+        List<GTask> gtasks = null;
+        
+        /**
+         * Constructor.
+         */
+        BinaryObjectiveFunction(double[][] x, int[] y, double lambda) {
+            this.x = x;
+            this.y = y;
+            this.lambda = lambda;
+
+            int n = x.length;
+            int m = MulticoreExecutor.getThreadPoolSize();
+            if (n >= 1000 && m >= 2) {
+                ftasks = new ArrayList<>(m + 1);
+                gtasks = new ArrayList<>(m + 1);
+                int step = n / m;
+                if (step < 100) {
+                    step = 100;
+                }
+
+                int start = 0;
+                int end = step;
+                for (int i = 0; i < m - 1; i++) {
+                    ftasks.add(new FTask(start, end));
+                    gtasks.add(new GTask(start, end));
+                    start += step;
+                    end += step;
+                }
+                ftasks.add(new FTask(start, n));
+                gtasks.add(new GTask(start, n));
+            }
+        }
+
+        @Override
+        public double f(double[] w) {
+            double f = Double.NaN;
+            int p = w.length - 1;
+
+            if (ftasks != null) {
+                for (FTask task : ftasks) {
+                    task.w = w;
+                }
+                
+                try {
+                    f = 0.0;
+                    for (double fi : MulticoreExecutor.run(ftasks)) {
+                        f += fi;
+                    }
+                } catch (Exception ex) {
+                    logger.error("Failed to train Logistic Regression on multi-core", ex);
+                    f = Double.NaN;
+                }
+            }
+
+            if (Double.isNaN(f)) {
+                f = 0.0;
+                int n = x.length;
+                for (int i = 0; i < n; i++) {
+                    double wx = dot(x[i], w);
+                    f += log1pe(wx) - y[i] * wx;
+                }
+            }
+            
+            if (lambda != 0.0) {
+                double w2 = 0.0;
+                for (int i = 0; i < p; i++) {
+                    w2 += w[i] * w[i];
+                }
+
+                f += 0.5 * lambda * w2;
+            }
+
+            return f;
+        }
+        
+        @Override
+        public double f(double[] w, double[] g) {
+            double f = Double.NaN;
+            int p = w.length - 1;
+            Arrays.fill(g, 0.0);
+
+            if (gtasks != null) {
+                for (GTask task : gtasks) {
+                    task.w = w;
+                }
+                
+                try {
+                    f = 0.0;
+                    for (double[] gi : MulticoreExecutor.run(gtasks)) {
+                        f += gi[w.length];
+                        for (int i = 0; i < w.length; i++) {
+                            g[i] += gi[i];
+                        }
+                    }
+                } catch (Exception ex) {
+                    logger.error("Failed to train Logistic Regression on multi-core", ex);
+                    f = Double.NaN;
+                }
+            }
+
+            if (Double.isNaN(f)) {
+                f = 0.0;
+                int n = x.length;
+                for (int i = 0; i < n; i++) {
+                    double wx = dot(x[i], w);
+                    f += log1pe(wx) - y[i] * wx;
+
+                    double yi = y[i] - Math.logistic(wx);
+                    for (int j = 0; j < p; j++) {
+                        g[j] -= yi * x[i][j];
+                    }
+                    g[p] -= yi;
+                }
+            }
+
+            if (lambda != 0.0) {
+                double w2 = 0.0;
+                for (int i = 0; i < p; i++) {
+                    w2 += w[i] * w[i];
+                }
+
+                f += 0.5 * lambda * w2;
+
+                for (int j = 0; j < p; j++) {
+                    g[j] += lambda * w[j];
+                }
+            }
+
+            return f;
+        }
+    }
+
+    /**
+     * Multi-class logistic regression objective function.
+     */
+    static class MultiClassObjectiveFunction implements DifferentiableMultivariateFunction {
+
+        /**
+         * Task to calculate the objective function.
+         */
+        class FTask implements Callable<Double> {
+
+            /**
+             * The parameter vector.
+             */
+            double[] w;
+            /**
+             * The start index of data portion for this task.
+             */
+            int start;
+            /**
+             * The end index of data portion for this task.
+             */
+            int end;
+
+            FTask(int start, int end) {
+                this.start = start;
+                this.end = end;
+            }
+
+            @Override
+            public Double call() {
+                double f = 0.0;
+
+                int p = x[0].length;
+                double[] prob = new double[k];
+
+                for (int i = start; i < end; i++) {
+                    for (int j = 0; j < k; j++) {
+                        prob[j] = dot(x[i], w, j * (p + 1));
+                    }
+
+                    softmax(prob);
+
+                    f -= log(prob[y[i]]);
+                }
+                return f;
+            }
+        }
+        /**
+         * Task to calculate the objective function and gradient.
+         */
+        class GTask implements Callable<double[]> {
+
+            /**
+             * The parameter vector.
+             */
+            double[] w;
+            /**
+             * The start index of data portion for this task.
+             */
+            int start;
+            /**
+             * The end index of data portion for this task.
+             */
+            int end;
+
+            GTask(int start, int end) {
+                this.start = start;
+                this.end = end;
+            }
+
+            @Override
+            public double[] call() {
+                double f = 0.0;
+                double[] g = new double[w.length+1];
+
+                int p = x[0].length;
+                double[] prob = new double[k];
+
+                for (int i = start; i < end; i++) {
+                    for (int j = 0; j < k; j++) {
+                        prob[j] = dot(x[i], w, j * (p + 1));
+                    }
+
+                    softmax(prob);
+
+                    f -= log(prob[y[i]]);
+
+                    double yi = 0.0;
+                    for (int j = 0; j < k; j++) {
+                        yi = (y[i] == j ? 1.0 : 0.0) - prob[j];
+
+                        for (int l = 0, pos = j * (p + 1); l < p; l++) {
+                            g[pos + l] -= yi * x[i][l];
+                        }
+                        g[j * (p + 1) + p] -= yi;
+                    }
+                }
+                
+                g[w.length] = f;
+                return g;
+            }
+        }
+        /**
+         * Training instances.
+         */
+        double[][] x;
+        /**
+         * Training labels.
+         */
+        int[] y;
+        /**
+         * The number of classes.
+         */
+        int k;
+        /**
+         * Regularization factor.
+         */
+        double lambda;
+
+        /**
+         * Parallel computing of objective function.
+         */
+        List<FTask> ftasks = null;
+
+        /**
+         * Parallel computing of objective function and gradient.
+         */
+        List<GTask> gtasks = null;
+        
+        /**
+         * Constructor.
+         */
+        MultiClassObjectiveFunction(double[][] x, int[] y, int k, double lambda) {
+            this.x = x;
+            this.y = y;
+            this.k = k;
+            this.lambda = lambda;
+
+            int n = x.length;
+            int m = MulticoreExecutor.getThreadPoolSize();
+            if (n >= 1000 && m >= 2) {
+                ftasks = new ArrayList<>(m + 1);
+                gtasks = new ArrayList<>(m + 1);
+                int step = n / m;
+                if (step < 100) {
+                    step = 100;
+                }
+
+                int start = 0;
+                int end = step;
+                for (int i = 0; i < m - 1; i++) {
+                    ftasks.add(new FTask(start, end));
+                    gtasks.add(new GTask(start, end));
+                    start += step;
+                    end += step;
+                }
+                ftasks.add(new FTask(start, n));
+                gtasks.add(new GTask(start, n));
+            }
+        }
+
+        @Override
+        public double f(double[] w) {
+            double f = Double.NaN;
+            int p = x[0].length;
+            double[] prob = new double[k];
+
+            if (ftasks != null) {
+                for (FTask task : ftasks) {
+                    task.w = w;
+                }
+                
+                try {
+                    f = 0.0;
+                    for (double fi : MulticoreExecutor.run(ftasks)) {
+                        f += fi;
+                    }
+                } catch (Exception ex) {
+                    logger.error("Failed to train Logistic Regression on multi-core", ex);
+                    f = Double.NaN;
+                }
+            }
+
+            if (Double.isNaN(f)) {
+                f = 0.0;
+                int n = x.length;
+                for (int i = 0; i < n; i++) {
+                    for (int j = 0; j < k; j++) {
+                        prob[j] = dot(x[i], w, j * (p + 1));
+                    }
+
+                    softmax(prob);
+
+                    f -= log(prob[y[i]]);
+                }
+            }
+
+            if (lambda != 0.0) {
+                double w2 = 0.0;
+                for (int i = 0; i < k; i++) {
+                    for (int j = 0; j < p; j++) {
+                        w2 += Math.sqr(w[i*(p+1) + j]);
+                    }
+                }
+
+                f += 0.5 * lambda * w2;
+            }
+
+            return f;
+        }
+        
+        @Override
+        public double f(double[] w, double[] g) {
+            double f = Double.NaN;
+            int p = x[0].length;
+            double[] prob = new double[k];            
+            Arrays.fill(g, 0.0);
+
+            if (gtasks != null) {
+                for (GTask task : gtasks) {
+                    task.w = w;
+                }
+                
+                try {
+                    f = 0.0;
+                    for (double[] gi : MulticoreExecutor.run(gtasks)) {
+                        f += gi[w.length];
+                        for (int i = 0; i < w.length; i++) {
+                            g[i] += gi[i];
+                        }
+                    }
+                } catch (Exception ex) {
+                    logger.error("Failed to train Logistic Regression on multi-core", ex);
+                    f = Double.NaN;
+                }
+            }
+
+            if (Double.isNaN(f)) {
+                f = 0.0;
+                int n = x.length;
+                for (int i = 0; i < n; i++) {
+                    for (int j = 0; j < k; j++) {
+                        prob[j] = dot(x[i], w, j * (p + 1));
+                    }
+
+                    softmax(prob);
+
+                    f -= log(prob[y[i]]);
+
+                    double yi = 0.0;
+                    for (int j = 0; j < k; j++) {
+                        yi = (y[i] == j ? 1.0 : 0.0) - prob[j];
+
+                        for (int l = 0, pos = j * (p + 1); l < p; l++) {
+                            g[pos + l] -= yi * x[i][l];
+                        }
+                        g[j * (p + 1) + p] -= yi;
+                    }
+                }
+            }
+
+            if (lambda != 0.0) {
+                double w2 = 0.0;
+                for (int i = 0; i < k; i++) {
+                    for (int j = 0; j < p; j++) {
+                        int pos = i * (p+1) + j;
+                        w2 += w[pos] * w[pos];
+                        g[pos] += lambda * w[pos];
+                    }
+                }
+
+                f += 0.5 * lambda * w2;
+            }
+
+            return f;
+        }
+    }
+
     private static final long serialVersionUID = 1L;
+
     private static final Logger logger = LoggerFactory.getLogger(LogisticRegression.class);
+
+    /**
+     * Returns the dot product between weight vector and x (augmented with 1).
+     */
+    private static double dot(double[] x, double[] w) {
+        int i = 0;
+        double dot = 0.0;
+
+        for (; i < x.length; i++) {
+            dot += x[i] * w[i];
+        }
+
+        return dot + w[i];
+    }
+
+    /**
+     * Returns the dot product between weight vector and x (augmented with 1).
+     */
+    private static double dot(double[] x, double[] w, int pos) {
+        int i = 0;
+        double dot = 0.0;
+        
+        for (; i < x.length; i++) {
+            dot += x[i] * w[pos+i];
+        }
+
+        return dot + w[pos+i];
+    }
+
+    /**
+     * Returns natural log without underflow.
+     */
+    private static double log(double x) {
+        double y = 0.0;
+        if (x < 1E-300) {
+            y = -690.7755;
+        } else {
+            y = Math.log(x);
+        }
+        return y;
+    }
+    
+    /**
+     * Returns natural log(1+exp(x)) without overflow.
+     */
+    private static double log1pe(double x) {
+        double y = 0.0;
+        if (x > 15) {
+            y = x;
+        } else {
+            y += Math.log1p(Math.exp(x));
+        }
+
+        return y;
+    }
+
+    /**
+     * Calculate softmax function without overflow.
+     */
+    private static void softmax(double[] prob) {
+        double max = Double.NEGATIVE_INFINITY;
+        for (int i = 0; i < prob.length; i++) {
+            if (prob[i] > max) {
+                max = prob[i];
+            }
+        }
+
+        double Z = 0.0;
+        for (int i = 0; i < prob.length; i++) {
+            double p = Math.exp(prob[i] - max);
+            prob[i] = p;
+            Z += p;
+        }
+
+        for (int i = 0; i < prob.length; i++) {
+            prob[i] /= Z;
+        }
+    }
 
     /**
      * The dimension of input space.
@@ -105,102 +770,6 @@ public class LogisticRegression implements SoftClassifier<double[]>, Serializabl
     private double[][] W;
 
     /**
-     * Trainer for logistic regression.
-     */
-    public static class Trainer extends ClassifierTrainer<double[]> {
-
-        /**
-         * Regularization factor. &lambda; > 0 gives a "regularized" estimate
-         * of linear weights which often has superior generalization
-         * performance, especially when the dimensionality is high.
-         */
-        private double lambda = 0.0;
-        /**
-         * The tolerance for BFGS stopping iterations.
-         */
-        private double tol = 1E-5;
-        /**
-         * The maximum number of BFGS iterations.
-         */
-        private int maxIter = 500;
-
-        /**
-         * Constructor.
-         */
-        public Trainer() {
-
-        }
-        
-        /**
-         * Sets the regularization factor. &lambda; &gt; 0 gives a "regularized"
-         * estimate of linear weights which often has superior generalization
-         * performance, especially when the dimensionality is high.
-         * 
-         * @param lambda regularization factor.
-         */
-        public Trainer setRegularizationFactor(double lambda) {
-            this.lambda = lambda;
-            return this;
-        }
-        
-        /**
-         * Sets the tolerance for BFGS stopping iterations.
-         * 
-         * @param tol the tolerance for stopping iterations.
-         */
-        public Trainer setTolerance(double tol) {
-            if (tol <= 0.0) {
-                throw new IllegalArgumentException("Invalid tolerance: " + tol);
-            }
-
-            this.tol = tol;
-            return this;
-        }
-
-        /**
-         * Sets the maximum number of iterations.
-         * 
-         * @param maxIter the maximum number of iterations.
-         */
-        public Trainer setMaxNumIteration(int maxIter) {
-            if (maxIter <= 0) {
-                throw new IllegalArgumentException("Invalid maximum number of iterations: " + maxIter);
-            }
-
-            this.maxIter = maxIter;
-            return this;
-        }
-        
-        @Override
-        public LogisticRegression train(double[][] x, int[] y) {
-            return new LogisticRegression(x, y, lambda, tol, maxIter);
-        }
-    }
-    
-    /**
-     * Constructor. No regularization.
-     * 
-     * @param x training samples.
-     * @param y training labels in [0, k), where k is the number of classes.
-     */
-    public LogisticRegression(double[][] x, int[] y) {
-        this(x, y, 0.0);
-    }
-
-    /**
-     * Constructor.
-     * 
-     * @param x training samples.
-     * @param y training labels in [0, k), where k is the number of classes.
-     * @param lambda &lambda; &gt; 0 gives a "regularized" estimate of linear
-     * weights which often has superior generalization performance, especially
-     * when the dimensionality is high.
-     */
-    public LogisticRegression(double[][] x, int[] y, double lambda) {
-        this(x, y, lambda, 1E-5, 500);
-    }
-
-    /**
      * Constructor.
      * 
      * @param x training samples.
@@ -210,8 +779,10 @@ public class LogisticRegression implements SoftClassifier<double[]>, Serializabl
      * when the dimensionality is high.
      * @param tol the tolerance for stopping iterations.
      * @param maxIter the maximum number of iterations.
+     * @param interrupt
      */
-    public LogisticRegression(double[][] x, int[] y, double lambda, double tol, int maxIter) {
+    public LogisticRegression(double[][] x, int[] y, double lambda, double tol, int maxIter, TrainingInterrupt interrupt) {
+        super(interrupt);
         if (x.length != y.length) {
             throw new IllegalArgumentException(String.format("The sizes of X and Y don't match: %d != %d", x.length, y.length));
         }
@@ -284,594 +855,28 @@ public class LogisticRegression implements SoftClassifier<double[]>, Serializabl
     }
 
     /**
-     * Returns natural log(1+exp(x)) without overflow.
+     * Constructor.
+     * 
+     * @param x training samples.
+     * @param y training labels in [0, k), where k is the number of classes.
+     * @param lambda &lambda; &gt; 0 gives a "regularized" estimate of linear
+     * weights which often has superior generalization performance, especially
+     * when the dimensionality is high.
+     * @param interrupt
      */
-    private static double log1pe(double x) {
-        double y = 0.0;
-        if (x > 15) {
-            y = x;
-        } else {
-            y += Math.log1p(Math.exp(x));
-        }
-
-        return y;
+    public LogisticRegression(double[][] x, int[] y, double lambda, TrainingInterrupt interrupt) {
+        this(x, y, lambda, 1E-5, 500, interrupt);
     }
 
     /**
-     * Binary-class logistic regression objective function.
+     * Constructor. No regularization.
+     * 
+     * @param x training samples.
+     * @param y training labels in [0, k), where k is the number of classes.
+     * @param interrupt
      */
-    static class BinaryObjectiveFunction implements DifferentiableMultivariateFunction {
-
-        /**
-         * Training instances.
-         */
-        double[][] x;
-        /**
-         * Training labels.
-         */
-        int[] y;
-        /**
-         * Regularization factor.
-         */
-        double lambda;
-        /**
-         * Parallel computing of objective function.
-         */
-        List<FTask> ftasks = null;
-        /**
-         * Parallel computing of objective function and gradient.
-         */
-        List<GTask> gtasks = null;
-        
-        /**
-         * Constructor.
-         */
-        BinaryObjectiveFunction(double[][] x, int[] y, double lambda) {
-            this.x = x;
-            this.y = y;
-            this.lambda = lambda;
-
-            int n = x.length;
-            int m = MulticoreExecutor.getThreadPoolSize();
-            if (n >= 1000 && m >= 2) {
-                ftasks = new ArrayList<>(m + 1);
-                gtasks = new ArrayList<>(m + 1);
-                int step = n / m;
-                if (step < 100) {
-                    step = 100;
-                }
-
-                int start = 0;
-                int end = step;
-                for (int i = 0; i < m - 1; i++) {
-                    ftasks.add(new FTask(start, end));
-                    gtasks.add(new GTask(start, end));
-                    start += step;
-                    end += step;
-                }
-                ftasks.add(new FTask(start, n));
-                gtasks.add(new GTask(start, n));
-            }
-        }
-
-        /**
-         * Task to calculate the objective function.
-         */
-        class FTask implements Callable<Double> {
-
-            /**
-             * The parameter vector.
-             */
-            double[] w;
-            /**
-             * The start index of data portion for this task.
-             */
-            int start;
-            /**
-             * The end index of data portion for this task.
-             */
-            int end;
-
-            FTask(int start, int end) {
-                this.start = start;
-                this.end = end;
-            }
-
-            @Override
-            public Double call() {
-                double f = 0.0;
-                for (int i = start; i < end; i++) {
-                    double wx = dot(x[i], w);
-                    f += log1pe(wx) - y[i] * wx;
-                }
-                return f;
-            }
-        }
-        
-        @Override
-        public double f(double[] w) {
-            double f = Double.NaN;
-            int p = w.length - 1;
-
-            if (ftasks != null) {
-                for (FTask task : ftasks) {
-                    task.w = w;
-                }
-                
-                try {
-                    f = 0.0;
-                    for (double fi : MulticoreExecutor.run(ftasks)) {
-                        f += fi;
-                    }
-                } catch (Exception ex) {
-                    logger.error("Failed to train Logistic Regression on multi-core", ex);
-                    f = Double.NaN;
-                }
-            }
-
-            if (Double.isNaN(f)) {
-                f = 0.0;
-                int n = x.length;
-                for (int i = 0; i < n; i++) {
-                    double wx = dot(x[i], w);
-                    f += log1pe(wx) - y[i] * wx;
-                }
-            }
-            
-            if (lambda != 0.0) {
-                double w2 = 0.0;
-                for (int i = 0; i < p; i++) {
-                    w2 += w[i] * w[i];
-                }
-
-                f += 0.5 * lambda * w2;
-            }
-
-            return f;
-        }
-
-        /**
-         * Task to calculate the objective function and gradient.
-         */
-        class GTask implements Callable<double[]> {
-
-            /**
-             * The parameter vector.
-             */
-            double[] w;
-            /**
-             * The start index of data portion for this task.
-             */
-            int start;
-            /**
-             * The end index of data portion for this task.
-             */
-            int end;
-
-            GTask(int start, int end) {
-                this.start = start;
-                this.end = end;
-            }
-
-            @Override
-            public double[] call() {
-                double f = 0.0;
-                int p = w.length - 1;
-                double[] g = new double[w.length + 1];
-                
-                for (int i = start; i < end; i++) {
-                    double wx = dot(x[i], w);
-                    f += log1pe(wx) - y[i] * wx;
-                    
-                    double yi = y[i] - Math.logistic(wx);
-                    for (int j = 0; j < p; j++) {
-                        g[j] -= yi * x[i][j];
-                    }
-                    g[p] -= yi;
-                }
-                
-                g[w.length] = f;
-                return g;
-            }
-        }
-        
-        @Override
-        public double f(double[] w, double[] g) {
-            double f = Double.NaN;
-            int p = w.length - 1;
-            Arrays.fill(g, 0.0);
-
-            if (gtasks != null) {
-                for (GTask task : gtasks) {
-                    task.w = w;
-                }
-                
-                try {
-                    f = 0.0;
-                    for (double[] gi : MulticoreExecutor.run(gtasks)) {
-                        f += gi[w.length];
-                        for (int i = 0; i < w.length; i++) {
-                            g[i] += gi[i];
-                        }
-                    }
-                } catch (Exception ex) {
-                    logger.error("Failed to train Logistic Regression on multi-core", ex);
-                    f = Double.NaN;
-                }
-            }
-
-            if (Double.isNaN(f)) {
-                f = 0.0;
-                int n = x.length;
-                for (int i = 0; i < n; i++) {
-                    double wx = dot(x[i], w);
-                    f += log1pe(wx) - y[i] * wx;
-
-                    double yi = y[i] - Math.logistic(wx);
-                    for (int j = 0; j < p; j++) {
-                        g[j] -= yi * x[i][j];
-                    }
-                    g[p] -= yi;
-                }
-            }
-
-            if (lambda != 0.0) {
-                double w2 = 0.0;
-                for (int i = 0; i < p; i++) {
-                    w2 += w[i] * w[i];
-                }
-
-                f += 0.5 * lambda * w2;
-
-                for (int j = 0; j < p; j++) {
-                    g[j] += lambda * w[j];
-                }
-            }
-
-            return f;
-        }
-    }
-
-    /**
-     * Returns natural log without underflow.
-     */
-    private static double log(double x) {
-        double y = 0.0;
-        if (x < 1E-300) {
-            y = -690.7755;
-        } else {
-            y = Math.log(x);
-        }
-        return y;
-    }
-
-    /**
-     * Multi-class logistic regression objective function.
-     */
-    static class MultiClassObjectiveFunction implements DifferentiableMultivariateFunction {
-
-        /**
-         * Training instances.
-         */
-        double[][] x;
-        /**
-         * Training labels.
-         */
-        int[] y;
-        /**
-         * The number of classes.
-         */
-        int k;
-        /**
-         * Regularization factor.
-         */
-        double lambda;
-        /**
-         * Parallel computing of objective function.
-         */
-        List<FTask> ftasks = null;
-        /**
-         * Parallel computing of objective function and gradient.
-         */
-        List<GTask> gtasks = null;
-
-        /**
-         * Constructor.
-         */
-        MultiClassObjectiveFunction(double[][] x, int[] y, int k, double lambda) {
-            this.x = x;
-            this.y = y;
-            this.k = k;
-            this.lambda = lambda;
-
-            int n = x.length;
-            int m = MulticoreExecutor.getThreadPoolSize();
-            if (n >= 1000 && m >= 2) {
-                ftasks = new ArrayList<>(m + 1);
-                gtasks = new ArrayList<>(m + 1);
-                int step = n / m;
-                if (step < 100) {
-                    step = 100;
-                }
-
-                int start = 0;
-                int end = step;
-                for (int i = 0; i < m - 1; i++) {
-                    ftasks.add(new FTask(start, end));
-                    gtasks.add(new GTask(start, end));
-                    start += step;
-                    end += step;
-                }
-                ftasks.add(new FTask(start, n));
-                gtasks.add(new GTask(start, n));
-            }
-        }
-
-        /**
-         * Task to calculate the objective function.
-         */
-        class FTask implements Callable<Double> {
-
-            /**
-             * The parameter vector.
-             */
-            double[] w;
-            /**
-             * The start index of data portion for this task.
-             */
-            int start;
-            /**
-             * The end index of data portion for this task.
-             */
-            int end;
-
-            FTask(int start, int end) {
-                this.start = start;
-                this.end = end;
-            }
-
-            @Override
-            public Double call() {
-                double f = 0.0;
-
-                int p = x[0].length;
-                double[] prob = new double[k];
-
-                for (int i = start; i < end; i++) {
-                    for (int j = 0; j < k; j++) {
-                        prob[j] = dot(x[i], w, j * (p + 1));
-                    }
-
-                    softmax(prob);
-
-                    f -= log(prob[y[i]]);
-                }
-                return f;
-            }
-        }
-        
-        @Override
-        public double f(double[] w) {
-            double f = Double.NaN;
-            int p = x[0].length;
-            double[] prob = new double[k];
-
-            if (ftasks != null) {
-                for (FTask task : ftasks) {
-                    task.w = w;
-                }
-                
-                try {
-                    f = 0.0;
-                    for (double fi : MulticoreExecutor.run(ftasks)) {
-                        f += fi;
-                    }
-                } catch (Exception ex) {
-                    logger.error("Failed to train Logistic Regression on multi-core", ex);
-                    f = Double.NaN;
-                }
-            }
-
-            if (Double.isNaN(f)) {
-                f = 0.0;
-                int n = x.length;
-                for (int i = 0; i < n; i++) {
-                    for (int j = 0; j < k; j++) {
-                        prob[j] = dot(x[i], w, j * (p + 1));
-                    }
-
-                    softmax(prob);
-
-                    f -= log(prob[y[i]]);
-                }
-            }
-
-            if (lambda != 0.0) {
-                double w2 = 0.0;
-                for (int i = 0; i < k; i++) {
-                    for (int j = 0; j < p; j++) {
-                        w2 += Math.sqr(w[i*(p+1) + j]);
-                    }
-                }
-
-                f += 0.5 * lambda * w2;
-            }
-
-            return f;
-        }
-
-        /**
-         * Task to calculate the objective function and gradient.
-         */
-        class GTask implements Callable<double[]> {
-
-            /**
-             * The parameter vector.
-             */
-            double[] w;
-            /**
-             * The start index of data portion for this task.
-             */
-            int start;
-            /**
-             * The end index of data portion for this task.
-             */
-            int end;
-
-            GTask(int start, int end) {
-                this.start = start;
-                this.end = end;
-            }
-
-            @Override
-            public double[] call() {
-                double f = 0.0;
-                double[] g = new double[w.length+1];
-
-                int p = x[0].length;
-                double[] prob = new double[k];
-
-                for (int i = start; i < end; i++) {
-                    for (int j = 0; j < k; j++) {
-                        prob[j] = dot(x[i], w, j * (p + 1));
-                    }
-
-                    softmax(prob);
-
-                    f -= log(prob[y[i]]);
-
-                    double yi = 0.0;
-                    for (int j = 0; j < k; j++) {
-                        yi = (y[i] == j ? 1.0 : 0.0) - prob[j];
-
-                        for (int l = 0, pos = j * (p + 1); l < p; l++) {
-                            g[pos + l] -= yi * x[i][l];
-                        }
-                        g[j * (p + 1) + p] -= yi;
-                    }
-                }
-                
-                g[w.length] = f;
-                return g;
-            }
-        }
-        
-        @Override
-        public double f(double[] w, double[] g) {
-            double f = Double.NaN;
-            int p = x[0].length;
-            double[] prob = new double[k];            
-            Arrays.fill(g, 0.0);
-
-            if (gtasks != null) {
-                for (GTask task : gtasks) {
-                    task.w = w;
-                }
-                
-                try {
-                    f = 0.0;
-                    for (double[] gi : MulticoreExecutor.run(gtasks)) {
-                        f += gi[w.length];
-                        for (int i = 0; i < w.length; i++) {
-                            g[i] += gi[i];
-                        }
-                    }
-                } catch (Exception ex) {
-                    logger.error("Failed to train Logistic Regression on multi-core", ex);
-                    f = Double.NaN;
-                }
-            }
-
-            if (Double.isNaN(f)) {
-                f = 0.0;
-                int n = x.length;
-                for (int i = 0; i < n; i++) {
-                    for (int j = 0; j < k; j++) {
-                        prob[j] = dot(x[i], w, j * (p + 1));
-                    }
-
-                    softmax(prob);
-
-                    f -= log(prob[y[i]]);
-
-                    double yi = 0.0;
-                    for (int j = 0; j < k; j++) {
-                        yi = (y[i] == j ? 1.0 : 0.0) - prob[j];
-
-                        for (int l = 0, pos = j * (p + 1); l < p; l++) {
-                            g[pos + l] -= yi * x[i][l];
-                        }
-                        g[j * (p + 1) + p] -= yi;
-                    }
-                }
-            }
-
-            if (lambda != 0.0) {
-                double w2 = 0.0;
-                for (int i = 0; i < k; i++) {
-                    for (int j = 0; j < p; j++) {
-                        int pos = i * (p+1) + j;
-                        w2 += w[pos] * w[pos];
-                        g[pos] += lambda * w[pos];
-                    }
-                }
-
-                f += 0.5 * lambda * w2;
-            }
-
-            return f;
-        }
-    }
-
-    /**
-     * Calculate softmax function without overflow.
-     */
-    private static void softmax(double[] prob) {
-        double max = Double.NEGATIVE_INFINITY;
-        for (int i = 0; i < prob.length; i++) {
-            if (prob[i] > max) {
-                max = prob[i];
-            }
-        }
-
-        double Z = 0.0;
-        for (int i = 0; i < prob.length; i++) {
-            double p = Math.exp(prob[i] - max);
-            prob[i] = p;
-            Z += p;
-        }
-
-        for (int i = 0; i < prob.length; i++) {
-            prob[i] /= Z;
-        }
-    }
-
-    /**
-     * Returns the dot product between weight vector and x (augmented with 1).
-     */
-    private static double dot(double[] x, double[] w) {
-        int i = 0;
-        double dot = 0.0;
-
-        for (; i < x.length; i++) {
-            dot += x[i] * w[i];
-        }
-
-        return dot + w[i];
-    }
-
-    /**
-     * Returns the dot product between weight vector and x (augmented with 1).
-     */
-    private static double dot(double[] x, double[] w, int pos) {
-        int i = 0;
-        double dot = 0.0;
-        
-        for (; i < x.length; i++) {
-            dot += x[i] * w[pos+i];
-        }
-
-        return dot + w[pos+i];
+    public LogisticRegression(double[][] x, int[] y, TrainingInterrupt interrupt) {
+        this(x, y, 0.0, interrupt);
     }
 
     /**

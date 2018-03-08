@@ -51,35 +51,7 @@ import smile.util.MulticoreExecutor;
  * 
  * @author Haifeng Li
  */
-public class Maxent implements SoftClassifier<int[]>, Serializable {
-    private static final long serialVersionUID = 1L;
-    private static final Logger logger = LoggerFactory.getLogger(Maxent.class);
-
-    /**
-     * The dimension of input space.
-     */
-    private int p;
-
-    /**
-     * The number of classes.
-     */
-    private int k;
-
-    /**
-     * The log-likelihood of learned model.
-     */
-    private double L;
-
-    /**
-     * The linear weights for binary logistic regression.
-     */
-    private double[] w;
-
-    /**
-     * The linear weights for multi-class logistic regression.
-     */
-    private double[][] W;
-
+public class Maxent extends SoftClassifier<int[]> implements Serializable {
     /**
      * Trainer for maximum entropy classifier.
      */
@@ -107,13 +79,25 @@ public class Maxent implements SoftClassifier<int[]>, Serializable {
         /**
          * Constructor.
          * @param p the dimension of feature space.
+         * @param interrupt
          */
-        public Trainer(int p) {
+        public Trainer(int p, TrainingInterrupt interrupt) {
+            super(interrupt);
             if (p < 0) {
                 throw new IllegalArgumentException("Invalid dimension: " + p);
             }
 
             this.p = p;
+        }
+        
+        /**
+         * Sets the maximum number of BFGS stopping iterations.
+         * 
+         * @param maxIter maximum number of iterations.
+         */
+        public Trainer setMaxNumIteration(int maxIter) {
+            this.maxIter = maxIter;
+            return this;
         }
         
         /**
@@ -138,186 +122,15 @@ public class Maxent implements SoftClassifier<int[]>, Serializable {
             return this;
         }
         
-        /**
-         * Sets the maximum number of BFGS stopping iterations.
-         * 
-         * @param maxIter maximum number of iterations.
-         */
-        public Trainer setMaxNumIteration(int maxIter) {
-            this.maxIter = maxIter;
-            return this;
-        }
-        
         @Override
         public Maxent train(int[][] x, int[] y) {
-            return new Maxent(p, x, y, lambda, tol, maxIter);
+            return new Maxent(p, x, y, lambda, tol, maxIter, interrupt);
         }
     }
-    
-    /**
-     * Learn maximum entropy classifier from samples of binary sparse features.
-     * @param p the dimension of feature space.
-     * @param x training samples. Each sample is represented by a set of sparse
-     * binary features. The features are stored in an integer array, of which
-     * are the indices of nonzero features.
-     * @param y training labels in [0, k), where k is the number of classes.
-     */
-    public Maxent(int p, int[][] x, int[] y) {
-        this(p, x, y, 0.1);
-    }
-
-    /**
-     * Learn maximum entropy classifier from samples of binary sparse features.
-     * @param p the dimension of feature space.
-     * @param x training samples. Each sample is represented by a set of sparse
-     * binary features. The features are stored in an integer array, of which
-     * are the indices of nonzero features.
-     * @param y training labels in [0, k), where k is the number of classes.
-     * @param lambda &lambda; &gt; 0 gives a "regularized" estimate of linear
-     * weights which often has superior generalization performance, especially
-     * when the dimensionality is high.
-     */
-    public Maxent(int p, int[][] x, int[] y, double lambda) {
-        this(p, x, y, lambda, 1E-5, 500);
-    }
-
-    /**
-     * Learn maximum entropy classifier from samples of binary sparse features.
-     * @param p the dimension of feature space.
-     * @param x training samples. Each sample is represented by a set of sparse
-     * binary features. The features are stored in an integer array, of which
-     * are the indices of nonzero features.
-     * @param y training labels in [0, k), where k is the number of classes.
-     * @param lambda &lambda; &gt; 0 gives a "regularized" estimate of linear
-     * weights which often has superior generalization performance, especially
-     * when the dimensionality is high.
-     * @param tol tolerance for stopping iterations.
-     * @param maxIter maximum number of iterations.
-     */
-    public Maxent(int p, int[][] x, int[] y, double lambda, double tol, int maxIter) {
-        if (x.length != y.length) {
-            throw new IllegalArgumentException(String.format("The sizes of X and Y don't match: %d != %d", x.length, y.length));
-        }
-
-        if (p < 0) {
-            throw new IllegalArgumentException("Invalid dimension: " + p);            
-        }
-        
-        if (lambda < 0) {
-            throw new IllegalArgumentException("Invalid regularization factor: " + lambda);
-        }
-
-        if (tol <= 0.0) {
-            throw new IllegalArgumentException("Invalid tolerance: " + tol);            
-        }
-        
-        if (maxIter <= 0) {
-            throw new IllegalArgumentException("Invalid maximum number of iterations: " + maxIter);            
-        }
-        
-        this.p = p;
-        
-        // class label set.
-        int[] labels = Math.unique(y);
-        Arrays.sort(labels);
-        
-        for (int i = 0; i < labels.length; i++) {
-            if (labels[i] < 0) {
-                throw new IllegalArgumentException("Negative class label: " + labels[i]); 
-            }
-            
-            if (i > 0 && labels[i] - labels[i-1] > 1) {
-                throw new IllegalArgumentException("Missing class: " + labels[i]+1);                 
-            }
-        }
-
-        k = labels.length;
-        if (k < 2) {
-            throw new IllegalArgumentException("Only one class.");            
-        }
-
-        if (k == 2) {
-            BinaryObjectiveFunction func = new BinaryObjectiveFunction(x, y, lambda);
-
-            w = new double[p + 1];
-
-            L = 0.0;
-            try {
-                L = -Math.min(func, 5, w, tol, maxIter);
-            } catch (Exception ex) {
-                logger.error("Failed to minimize binary objective function of Maximum Entropy Classifier", ex);
-            }
-        } else {
-            MultiClassObjectiveFunction func = new MultiClassObjectiveFunction(x, y, k, p, lambda);
-
-            w = new double[k * (p + 1)];
-
-            L = 0.0;
-            try {
-                L = -Math.min(func, 5, w, tol, maxIter);
-            } catch (Exception ex) {
-                logger.error("Failed to minimize multi-class objective function of Maximum Entropy Classifier", ex);
-            }
-
-            W = new double[k][p+1];
-            for (int i = 0, m = 0; i < k; i++) {
-                for (int j = 0; j <= p; j++, m++) {
-                    W[i][j] = w[m];
-                }
-            }
-
-            w = null;
-        }
-    }
-
-    /**
-     * Returns the dimension of input space.
-     * @return the dimension of input space.
-     */
-    public int getDimension() {
-    	return p;
-    }
-    
-    /**
-     * Returns natural log(1+exp(x)) without overflow.
-     */
-    private static double log1pe(double x) {
-        double y = 0.0;
-        if (x > 15) {
-            y = x;
-        } else {
-            y += Math.log1p(Math.exp(x));
-        }
-
-        return y;
-    }
-
     /**
      * Binary-class logistic regression objective function.
      */
     static class BinaryObjectiveFunction implements DifferentiableMultivariateFunction {
-
-        /**
-         * Training instances.
-         */
-        int[][] x;
-        /**
-         * Training labels.
-         */
-        int[] y;
-        /**
-         * Regularization factor.
-         */
-        double lambda;
-
-        /**
-         * Constructor.
-         */
-        BinaryObjectiveFunction(int[][] x, int[] y, double lambda) {
-            this.x = x;
-            this.y = y;
-            this.lambda = lambda;
-        }
 
         /**
          * Task to calculate the objective function.
@@ -353,7 +166,75 @@ public class Maxent implements SoftClassifier<int[]>, Serializable {
                 return f;
             }
         }
+        /**
+         * Task to calculate the objective function and gradient.
+         */
+        class GTask implements Callable<double[]> {
+
+            /**
+             * The parameter vector.
+             */
+            double[] w;
+            /**
+             * The start index of data portion for this task.
+             */
+            int start;
+            /**
+             * The end index of data portion for this task.
+             */
+            int end;
+
+            GTask(double[] w, int start, int end) {
+                this.w = w;
+                this.start = start;
+                this.end = end;
+            }
+
+            @Override
+            public double[] call() {
+                double f = 0.0;
+                int p = w.length - 1;
+                double[] g = new double[w.length + 1];
+                
+                for (int i = start; i < end; i++) {
+                    double wx = dot(x[i], w);
+                    f += log1pe(wx) - y[i] * wx;
+
+                    double yi = y[i] - Math.logistic(wx);
+                    for (int j : x[i]) {
+                        g[j] -= yi * j;
+                    }
+                    g[p] -= yi;
+                }
+                
+                g[w.length] = f;
+                return g;
+            }
+        }
+        /**
+         * Training instances.
+         */
+        int[][] x;
+
+        /**
+         * Training labels.
+         */
+        int[] y;
+
+        /**
+         * Regularization factor.
+         */
+        double lambda;
         
+        /**
+         * Constructor.
+         */
+        BinaryObjectiveFunction(int[][] x, int[] y, double lambda) {
+            this.x = x;
+            this.y = y;
+            this.lambda = lambda;
+        }
+
         @Override
         public double f(double[] w) {
             double f = 0.0;
@@ -402,52 +283,6 @@ public class Maxent implements SoftClassifier<int[]>, Serializable {
             }
 
             return f;
-        }
-
-        /**
-         * Task to calculate the objective function and gradient.
-         */
-        class GTask implements Callable<double[]> {
-
-            /**
-             * The parameter vector.
-             */
-            double[] w;
-            /**
-             * The start index of data portion for this task.
-             */
-            int start;
-            /**
-             * The end index of data portion for this task.
-             */
-            int end;
-
-            GTask(double[] w, int start, int end) {
-                this.w = w;
-                this.start = start;
-                this.end = end;
-            }
-
-            @Override
-            public double[] call() {
-                double f = 0.0;
-                int p = w.length - 1;
-                double[] g = new double[w.length + 1];
-                
-                for (int i = start; i < end; i++) {
-                    double wx = dot(x[i], w);
-                    f += log1pe(wx) - y[i] * wx;
-
-                    double yi = y[i] - Math.logistic(wx);
-                    for (int j : x[i]) {
-                        g[j] -= yi * j;
-                    }
-                    g[p] -= yi;
-                }
-                
-                g[w.length] = f;
-                return g;
-            }
         }
         
         @Override
@@ -522,54 +357,9 @@ public class Maxent implements SoftClassifier<int[]>, Serializable {
     }
 
     /**
-     * Returns natural log without underflow.
-     */
-    private static double log(double x) {
-        double y = 0.0;
-        if (x < 1E-300) {
-            y = -690.7755;
-        } else {
-            y = Math.log(x);
-        }
-        return y;
-    }
-
-    /**
      * Multi-class logistic regression objective function.
      */
     static class MultiClassObjectiveFunction implements DifferentiableMultivariateFunction {
-
-        /**
-         * Training instances.
-         */
-        int[][] x;
-        /**
-         * Training labels.
-         */
-        int[] y;
-        /**
-         * The number of classes.
-         */
-        int k;
-        /**
-         * The dimension of feature space.
-         */
-        int p;
-        /**
-         * Regularization factor.
-         */
-        double lambda;
-
-        /**
-         * Constructor.
-         */
-        MultiClassObjectiveFunction(int[][] x, int[] y, int k, int p, double lambda) {
-            this.x = x;
-            this.y = y;
-            this.k = k;
-            this.p = p;
-            this.lambda = lambda;
-        }
 
         /**
          * Task to calculate the objective function.
@@ -612,7 +402,95 @@ public class Maxent implements SoftClassifier<int[]>, Serializable {
                 return f;
             }
         }
+        /**
+         * Task to calculate the objective function and gradient.
+         */
+        class GTask implements Callable<double[]> {
+
+            /**
+             * The parameter vector.
+             */
+            double[] w;
+            /**
+             * The start index of data portion for this task.
+             */
+            int start;
+            /**
+             * The end index of data portion for this task.
+             */
+            int end;
+
+            GTask(double[] w, int start, int end) {
+                this.w = w;
+                this.start = start;
+                this.end = end;
+            }
+
+            @Override
+            public double[] call() {
+                double f = 0.0;
+                double[] prob = new double[k];
+                double[] g = new double[w.length+1];
+
+                for (int i = start; i < end; i++) {
+                    for (int j = 0; j < k; j++) {
+                        prob[j] = dot(x[i], w, j, p);
+                    }
+
+                    softmax(prob);
+
+                    f -= log(prob[y[i]]);
+
+                    double yi = 0.0;
+                    for (int j = 0; j < k; j++) {
+                        yi = (y[i] == j ? 1.0 : 0.0) - prob[j];
+
+                        int pos = j * (p + 1);
+                        for (int l : x[i]) {
+                            g[pos + l] -= yi;
+                        }
+                        g[pos + p] -= yi;
+                    }
+                }
+                
+                g[w.length] = f;
+                return g;
+            }
+        }
+        /**
+         * Training instances.
+         */
+        int[][] x;
+        /**
+         * Training labels.
+         */
+        int[] y;
+        /**
+         * The number of classes.
+         */
+        int k;
+
+        /**
+         * The dimension of feature space.
+         */
+        int p;
+
+        /**
+         * Regularization factor.
+         */
+        double lambda;
         
+        /**
+         * Constructor.
+         */
+        MultiClassObjectiveFunction(int[][] x, int[] y, int k, int p, double lambda) {
+            this.x = x;
+            this.y = y;
+            this.k = k;
+            this.p = p;
+            this.lambda = lambda;
+        }
+
         @Override
         public double f(double[] w) {
             double f = 0.0;
@@ -673,62 +551,6 @@ public class Maxent implements SoftClassifier<int[]>, Serializable {
             }
 
             return f;
-        }
-
-        /**
-         * Task to calculate the objective function and gradient.
-         */
-        class GTask implements Callable<double[]> {
-
-            /**
-             * The parameter vector.
-             */
-            double[] w;
-            /**
-             * The start index of data portion for this task.
-             */
-            int start;
-            /**
-             * The end index of data portion for this task.
-             */
-            int end;
-
-            GTask(double[] w, int start, int end) {
-                this.w = w;
-                this.start = start;
-                this.end = end;
-            }
-
-            @Override
-            public double[] call() {
-                double f = 0.0;
-                double[] prob = new double[k];
-                double[] g = new double[w.length+1];
-
-                for (int i = start; i < end; i++) {
-                    for (int j = 0; j < k; j++) {
-                        prob[j] = dot(x[i], w, j, p);
-                    }
-
-                    softmax(prob);
-
-                    f -= log(prob[y[i]]);
-
-                    double yi = 0.0;
-                    for (int j = 0; j < k; j++) {
-                        yi = (y[i] == j ? 1.0 : 0.0) - prob[j];
-
-                        int pos = j * (p + 1);
-                        for (int l : x[i]) {
-                            g[pos + l] -= yi;
-                        }
-                        g[pos + p] -= yi;
-                    }
-                }
-                
-                g[w.length] = f;
-                return g;
-            }
         }
         
         @Override
@@ -825,28 +647,9 @@ public class Maxent implements SoftClassifier<int[]>, Serializable {
         }
     }
 
-    /**
-     * Calculate softmax function without overflow.
-     */
-    private static void softmax(double[] prob) {
-        double max = Double.NEGATIVE_INFINITY;
-        for (int i = 0; i < prob.length; i++) {
-            if (prob[i] > max) {
-                max = prob[i];
-            }
-        }
+    private static final long serialVersionUID = 1L;
 
-        double Z = 0.0;
-        for (int i = 0; i < prob.length; i++) {
-            double p = Math.exp(prob[i] - max);
-            prob[i] = p;
-            Z += p;
-        }
-
-        for (int i = 0; i < prob.length; i++) {
-            prob[i] /= Z;
-        }
-    }
+    private static final Logger logger = LoggerFactory.getLogger(Maxent.class);
 
     /**
      * Returns the dot product between weight vector and x (augmented with 1).
@@ -873,6 +676,209 @@ public class Maxent implements SoftClassifier<int[]>, Serializable {
         }
 
         return dot;
+    }
+
+    /**
+     * Returns natural log without underflow.
+     */
+    private static double log(double x) {
+        double y = 0.0;
+        if (x < 1E-300) {
+            y = -690.7755;
+        } else {
+            y = Math.log(x);
+        }
+        return y;
+    }
+    
+    /**
+     * Returns natural log(1+exp(x)) without overflow.
+     */
+    private static double log1pe(double x) {
+        double y = 0.0;
+        if (x > 15) {
+            y = x;
+        } else {
+            y += Math.log1p(Math.exp(x));
+        }
+
+        return y;
+    }
+
+    /**
+     * Calculate softmax function without overflow.
+     */
+    private static void softmax(double[] prob) {
+        double max = Double.NEGATIVE_INFINITY;
+        for (int i = 0; i < prob.length; i++) {
+            if (prob[i] > max) {
+                max = prob[i];
+            }
+        }
+
+        double Z = 0.0;
+        for (int i = 0; i < prob.length; i++) {
+            double p = Math.exp(prob[i] - max);
+            prob[i] = p;
+            Z += p;
+        }
+
+        for (int i = 0; i < prob.length; i++) {
+            prob[i] /= Z;
+        }
+    }
+
+    /**
+     * The dimension of input space.
+     */
+    private int p;
+
+    /**
+     * The number of classes.
+     */
+    private int k;
+    
+    /**
+     * The log-likelihood of learned model.
+     */
+    private double L;
+
+    /**
+     * The linear weights for binary logistic regression.
+     */
+    private double[] w;
+
+    /**
+     * The linear weights for multi-class logistic regression.
+     */
+    private double[][] W;
+
+    /**
+     * Learn maximum entropy classifier from samples of binary sparse features.
+     * @param p the dimension of feature space.
+     * @param x training samples. Each sample is represented by a set of sparse
+     * binary features. The features are stored in an integer array, of which
+     * are the indices of nonzero features.
+     * @param y training labels in [0, k), where k is the number of classes.
+     * @param lambda &lambda; &gt; 0 gives a "regularized" estimate of linear
+     * weights which often has superior generalization performance, especially
+     * when the dimensionality is high.
+     * @param tol tolerance for stopping iterations.
+     * @param maxIter maximum number of iterations.
+     * @param interrupt
+     */
+    public Maxent(int p, int[][] x, int[] y, double lambda, double tol, int maxIter, TrainingInterrupt interrupt) {
+        super(interrupt);
+        if (x.length != y.length) {
+            throw new IllegalArgumentException(String.format("The sizes of X and Y don't match: %d != %d", x.length, y.length));
+        }
+
+        if (p < 0) {
+            throw new IllegalArgumentException("Invalid dimension: " + p);            
+        }
+        
+        if (lambda < 0) {
+            throw new IllegalArgumentException("Invalid regularization factor: " + lambda);
+        }
+
+        if (tol <= 0.0) {
+            throw new IllegalArgumentException("Invalid tolerance: " + tol);            
+        }
+        
+        if (maxIter <= 0) {
+            throw new IllegalArgumentException("Invalid maximum number of iterations: " + maxIter);            
+        }
+        
+        this.p = p;
+        
+        // class label set.
+        int[] labels = Math.unique(y);
+        Arrays.sort(labels);
+        
+        for (int i = 0; i < labels.length; i++) {
+            if (labels[i] < 0) {
+                throw new IllegalArgumentException("Negative class label: " + labels[i]); 
+            }
+            
+            if (i > 0 && labels[i] - labels[i-1] > 1) {
+                throw new IllegalArgumentException("Missing class: " + labels[i]+1);                 
+            }
+        }
+
+        k = labels.length;
+        if (k < 2) {
+            throw new IllegalArgumentException("Only one class.");            
+        }
+
+        if (k == 2) {
+            BinaryObjectiveFunction func = new BinaryObjectiveFunction(x, y, lambda);
+
+            w = new double[p + 1];
+
+            L = 0.0;
+            try {
+                L = -Math.min(func, 5, w, tol, maxIter);
+            } catch (Exception ex) {
+                logger.error("Failed to minimize binary objective function of Maximum Entropy Classifier", ex);
+            }
+        } else {
+            MultiClassObjectiveFunction func = new MultiClassObjectiveFunction(x, y, k, p, lambda);
+
+            w = new double[k * (p + 1)];
+
+            L = 0.0;
+            try {
+                L = -Math.min(func, 5, w, tol, maxIter);
+            } catch (Exception ex) {
+                logger.error("Failed to minimize multi-class objective function of Maximum Entropy Classifier", ex);
+            }
+
+            W = new double[k][p+1];
+            for (int i = 0, m = 0; i < k; i++) {
+                for (int j = 0; j <= p; j++, m++) {
+                    W[i][j] = w[m];
+                }
+            }
+
+            w = null;
+        }
+    }
+
+    /**
+     * Learn maximum entropy classifier from samples of binary sparse features.
+     * @param p the dimension of feature space.
+     * @param x training samples. Each sample is represented by a set of sparse
+     * binary features. The features are stored in an integer array, of which
+     * are the indices of nonzero features.
+     * @param y training labels in [0, k), where k is the number of classes.
+     * @param lambda &lambda; &gt; 0 gives a "regularized" estimate of linear
+     * weights which often has superior generalization performance, especially
+     * when the dimensionality is high.
+     * @param interrupt
+     */
+    public Maxent(int p, int[][] x, int[] y, double lambda, TrainingInterrupt interrupt) {
+        this(p, x, y, lambda, 1E-5, 500, interrupt);
+    }
+
+    /**
+     * Learn maximum entropy classifier from samples of binary sparse features.
+     * @param p the dimension of feature space.
+     * @param x training samples. Each sample is represented by a set of sparse
+     * binary features. The features are stored in an integer array, of which
+     * are the indices of nonzero features.
+     * @param y training labels in [0, k), where k is the number of classes.
+     * @param interrupt
+     */
+    public Maxent(int p, int[][] x, int[] y, TrainingInterrupt interrupt) {
+        this(p, x, y, 0.1, interrupt);
+    }
+
+    /**
+     * Returns the dimension of input space.
+     * @return the dimension of input space.
+     */
+    public int getDimension() {
+    	return p;
     }
 
     /**

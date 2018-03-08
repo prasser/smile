@@ -74,7 +74,7 @@ public class RDATest {
                 double[][] trainx = Math.slice(x, loocv.train[i]);
                 int[] trainy = Math.slice(y, loocv.train[i]);
 
-                RDA rda = new RDA(trainx, trainy, 0.0);
+                RDA rda = new RDA(trainx, trainy, 0.0, null);
                 if (y[loocv.test[i]] != rda.predict(x[loocv.test[i]]))
                      error++;
              }
@@ -86,7 +86,7 @@ public class RDATest {
                 double[][] trainx = Math.slice(x, loocv.train[i]);
                 int[] trainy = Math.slice(y, loocv.train[i]);
 
-                RDA rda = new RDA(trainx, trainy, 0.1);
+                RDA rda = new RDA(trainx, trainy, 0.1, null);
                 if (y[loocv.test[i]] != rda.predict(x[loocv.test[i]]))
                      error++;
              }
@@ -98,7 +98,7 @@ public class RDATest {
                 double[][] trainx = Math.slice(x, loocv.train[i]);
                 int[] trainy = Math.slice(y, loocv.train[i]);
 
-                RDA rda = new RDA(trainx, trainy, 0.2);
+                RDA rda = new RDA(trainx, trainy, 0.2, null);
                 if (y[loocv.test[i]] != rda.predict(x[loocv.test[i]]))
                      error++;
              }
@@ -110,7 +110,7 @@ public class RDATest {
                 double[][] trainx = Math.slice(x, loocv.train[i]);
                 int[] trainy = Math.slice(y, loocv.train[i]);
 
-                RDA rda = new RDA(trainx, trainy, 0.3);
+                RDA rda = new RDA(trainx, trainy, 0.3, null);
                 if (y[loocv.test[i]] != rda.predict(x[loocv.test[i]]))
                      error++;
              }
@@ -122,7 +122,7 @@ public class RDATest {
                 double[][] trainx = Math.slice(x, loocv.train[i]);
                 int[] trainy = Math.slice(y, loocv.train[i]);
 
-                RDA rda = new RDA(trainx, trainy, 0.4);
+                RDA rda = new RDA(trainx, trainy, 0.4, null);
                 if (y[loocv.test[i]] != rda.predict(x[loocv.test[i]]))
                      error++;
              }
@@ -134,7 +134,7 @@ public class RDATest {
                 double[][] trainx = Math.slice(x, loocv.train[i]);
                 int[] trainy = Math.slice(y, loocv.train[i]);
 
-                RDA rda = new RDA(trainx, trainy, 0.5);
+                RDA rda = new RDA(trainx, trainy, 0.5, null);
                 if (y[loocv.test[i]] != rda.predict(x[loocv.test[i]]))
                      error++;
              }
@@ -146,7 +146,7 @@ public class RDATest {
                 double[][] trainx = Math.slice(x, loocv.train[i]);
                 int[] trainy = Math.slice(y, loocv.train[i]);
 
-                RDA rda = new RDA(trainx, trainy, 0.6);
+                RDA rda = new RDA(trainx, trainy, 0.6, null);
                 if (y[loocv.test[i]] != rda.predict(x[loocv.test[i]]))
                      error++;
              }
@@ -158,7 +158,7 @@ public class RDATest {
                 double[][] trainx = Math.slice(x, loocv.train[i]);
                 int[] trainy = Math.slice(y, loocv.train[i]);
 
-                RDA rda = new RDA(trainx, trainy, 0.7);
+                RDA rda = new RDA(trainx, trainy, 0.7, null);
                 if (y[loocv.test[i]] != rda.predict(x[loocv.test[i]]))
                      error++;
              }
@@ -171,7 +171,7 @@ public class RDATest {
                 double[][] trainx = Math.slice(x, loocv.train[i]);
                 int[] trainy = Math.slice(y, loocv.train[i]);
 
-                RDA rda = new RDA(trainx, trainy, 0.8);
+                RDA rda = new RDA(trainx, trainy, 0.8, null);
                 if (y[loocv.test[i]] != rda.predict(x[loocv.test[i]], posteriori))
                      error++;
                 
@@ -185,7 +185,7 @@ public class RDATest {
                 double[][] trainx = Math.slice(x, loocv.train[i]);
                 int[] trainy = Math.slice(y, loocv.train[i]);
 
-                RDA rda = new RDA(trainx, trainy, 0.9);
+                RDA rda = new RDA(trainx, trainy, 0.9, null);
                 if (y[loocv.test[i]] != rda.predict(x[loocv.test[i]]))
                      error++;
              }
@@ -197,7 +197,7 @@ public class RDATest {
                 double[][] trainx = Math.slice(x, loocv.train[i]);
                 int[] trainy = Math.slice(y, loocv.train[i]);
 
-                RDA rda = new RDA(trainx, trainy, 1.0);
+                RDA rda = new RDA(trainx, trainy, 1.0, null);
                 if (y[loocv.test[i]] != rda.predict(x[loocv.test[i]]))
                      error++;
              }
@@ -225,7 +225,7 @@ public class RDATest {
             double[][] testx = test.toArray(new double[test.size()][]);
             int[] testy = test.toArray(new int[test.size()]);
             
-            RDA rda = new RDA(x, y, 0.7);
+            RDA rda = new RDA(x, y, 0.7, null);
             
             int error = 0;
             for (int i = 0; i < testx.length; i++) {

@@ -56,40 +56,7 @@ import smile.math.matrix.EigenValueDecomposition;
  * 
  * @author Haifeng Li
  */
-public class LDA implements SoftClassifier<double[]>, Serializable {
-    private static final long serialVersionUID = 1L;
-
-    /**
-     * The dimensionality of data.
-     */
-    private final int p;
-    /**
-     * The number of classes.
-     */
-    private final int k;
-    /**
-     * Constant term of discriminant function of each class.
-     */
-    private final double[] ct;
-    /**
-     * A priori probabilities of each class.
-     */
-    private final double[] priori;
-    /**
-     * Mean vectors of each class.
-     */
-    private final double[][] mu;
-    /**
-     * Eigen vectors of common covariance matrix, which transforms observations
-     * to discriminant functions, normalized so that common covariance
-     * matrix is spherical.
-     */
-    private final DenseMatrix scaling;
-    /**
-     * Eigen values of common variance matrix.
-     */
-    private final double[] eigen;
-
+public class LDA extends SoftClassifier<double[]> implements Serializable {
     /**
      * Trainer for linear discriminant analysis.
      */
@@ -107,8 +74,10 @@ public class LDA implements SoftClassifier<double[]>, Serializable {
         /**
          * Constructor. The default tolerance to covariance matrix singularity
          * is 1E-4.
+         * @param interrupt
          */
-        public Trainer() {
+        public Trainer(TrainingInterrupt interrupt) {
+            super(interrupt);
         }
         
         /**
@@ -137,40 +106,55 @@ public class LDA implements SoftClassifier<double[]>, Serializable {
         
         @Override
         public LDA train(double[][] x, int[] y) {
-            return new LDA(x, y, priori, tol);
+            return new LDA(x, y, priori, tol, interrupt);
         }
     }
+
+    private static final long serialVersionUID = 1L;
+    /**
+     * The dimensionality of data.
+     */
+    private final int p;
+    /**
+     * The number of classes.
+     */
+    private final int k;
+    /**
+     * Constant term of discriminant function of each class.
+     */
+    private final double[] ct;
+    /**
+     * A priori probabilities of each class.
+     */
+    private final double[] priori;
+    /**
+     * Mean vectors of each class.
+     */
+    private final double[][] mu;
+    /**
+     * Eigen vectors of common covariance matrix, which transforms observations
+     * to discriminant functions, normalized so that common covariance
+     * matrix is spherical.
+     */
+    private final DenseMatrix scaling;
+
+    /**
+     * Eigen values of common variance matrix.
+     */
+    private final double[] eigen;
     
-    /**
-     * Constructor. Learn linear discriminant analysis.
-     * @param x training samples.
-     * @param y training labels in [0, k), where k is the number of classes.
-     */
-    public LDA(double[][] x, int[] y) {
-        this(x, y, null);
-    }
-
-    /**
-     * Constructor. Learn linear discriminant analysis.
-     * @param x training samples.
-     * @param y training labels in [0, k), where k is the number of classes.
-     * @param priori the priori probability of each class.
-     */
-    public LDA(double[][] x, int[] y, double[] priori) {
-        this(x, y, priori, 1E-4);
-    }
-
     /**
      * Constructor. Learn linear discriminant analysis.
      * @param x training samples.
      * @param y training labels in [0, k), where k is the number of classes.
      * @param tol a tolerance to decide if a covariance matrix is singular; it
      * will reject variables whose variance is less than tol<sup>2</sup>.
+     * @param interrupt
      */
-    public LDA(double[][] x, int[] y, double tol) {
-        this(x, y, null, tol);
+    public LDA(double[][] x, int[] y, double tol, TrainingInterrupt interrupt) {
+        this(x, y, null, tol, interrupt);
     }
-    
+
     /**
      * Constructor. Learn linear discriminant analysis.
      * @param x training samples.
@@ -179,8 +163,10 @@ public class LDA implements SoftClassifier<double[]>, Serializable {
      * estimated from the training data.
      * @param tol a tolerance to decide if a covariance matrix is singular; it
      * will reject variables whose variance is less than tol<sup>2</sup>.
+     * @param interrupt
      */
-    public LDA(double[][] x, int[] y, double[] priori, double tol) {
+    public LDA(double[][] x, int[] y, double[] priori, double tol, TrainingInterrupt interrupt) {
+        super(interrupt);
         if (x.length != y.length) {
             throw new IllegalArgumentException(String.format("The sizes of X and Y don't match: %d != %d", x.length, y.length));
         }
@@ -303,6 +289,27 @@ public class LDA implements SoftClassifier<double[]>, Serializable {
 
         eigen = evd.getEigenValues();
         scaling = evd.getEigenVectors();
+    }
+
+    /**
+     * Constructor. Learn linear discriminant analysis.
+     * @param x training samples.
+     * @param y training labels in [0, k), where k is the number of classes.
+     * @param priori the priori probability of each class.
+     * @param interrupt
+     */
+    public LDA(double[][] x, int[] y, double[] priori, TrainingInterrupt interrupt) {
+        this(x, y, priori, 1E-4, interrupt);
+    }
+    
+    /**
+     * Constructor. Learn linear discriminant analysis.
+     * @param x training samples.
+     * @param y training labels in [0, k), where k is the number of classes.
+     * @param interrupt
+     */
+    public LDA(double[][] x, int[] y, TrainingInterrupt interrupt) {
+        this(x, y, null, interrupt);
     }
 
     /**

@@ -75,7 +75,7 @@ public class RandomForestTest {
                 double[][] trainx = Math.slice(x, loocv.train[i]);
                 int[] trainy = Math.slice(y, loocv.train[i]);
                 
-                RandomForest forest = new RandomForest(weather.attributes(), trainx, trainy, 100);
+                RandomForest forest = new RandomForest(weather.attributes(), trainx, trainy, 100, null);
                 if (y[loocv.test[i]] != forest.predict(x[loocv.test[i]]))
                     error++;
             }
@@ -107,7 +107,7 @@ public class RandomForestTest {
                 double[][] trainx = Math.slice(x, loocv.train[i]);
                 int[] trainy = Math.slice(y, loocv.train[i]);
                 
-                RandomForest forest = new RandomForest(iris.attributes(), trainx, trainy, 100);
+                RandomForest forest = new RandomForest(iris.attributes(), trainx, trainy, 100, null);
                 if (y[loocv.test[i]] != forest.predict(x[loocv.test[i]]))
                     error++;
             }
@@ -136,7 +136,7 @@ public class RandomForestTest {
             double[][] testx = test.toArray(new double[test.size()][]);
             int[] testy = test.toArray(new int[test.size()]);
             
-            RandomForest forest = new RandomForest(x, y, 200);
+            RandomForest forest = new RandomForest(x, y, 200, null);
             
             int error = 0;
             for (int i = 0; i < testx.length; i++) {
@@ -193,7 +193,7 @@ public class RandomForestTest {
                 attributes[i] = new NominalAttribute("V"+i, values);
             }
             
-            RandomForest forest = new RandomForest(attributes, x, y, 200);
+            RandomForest forest = new RandomForest(attributes, x, y, 200, null);
             
             int error = 0;
             for (int i = 0; i < testx.length; i++) {

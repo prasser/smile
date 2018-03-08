@@ -81,7 +81,7 @@ public class LogisticRegressionTest {
             for (int i = 0; i < n; i++) {
                 double[][] trainx = Math.slice(x, loocv.train[i]);
                 int[] trainy = Math.slice(y, loocv.train[i]);
-                LogisticRegression logit = new LogisticRegression(trainx, trainy);
+                LogisticRegression logit = new LogisticRegression(trainx, trainy, null);
 
                 if (y[loocv.test[i]] != logit.predict(x[loocv.test[i]]))
                     error++;
@@ -113,7 +113,7 @@ public class LogisticRegressionTest {
             for (int i = 0; i < n; i++) {
                 double[][] trainx = Math.slice(x, loocv.train[i]);
                 int[] trainy = Math.slice(y, loocv.train[i]);
-                LogisticRegression logit = new LogisticRegression(trainx, trainy);
+                LogisticRegression logit = new LogisticRegression(trainx, trainy, null);
 
                 if (y[loocv.test[i]] != logit.predict(x[loocv.test[i]]))
                     error++;
@@ -143,7 +143,7 @@ public class LogisticRegressionTest {
             double[][] testx = test.toArray(new double[test.size()][]);
             int[] testy = test.toArray(new int[test.size()]);
 
-            LogisticRegression logit = new LogisticRegression(x, y, 0.05, 1E-3, 1000);
+            LogisticRegression logit = new LogisticRegression(x, y, 0.05, 1E-3, 1000, null);
             
             int error = 0;
             for (int i = 0; i < testx.length; i++) {
@@ -176,7 +176,7 @@ public class LogisticRegressionTest {
             double[][] testx = test.toArray(new double[test.size()][]);
             int[] testy = test.toArray(new int[test.size()]);
             
-            LogisticRegression logit = new LogisticRegression(x, y, 0.3, 1E-3, 1000);
+            LogisticRegression logit = new LogisticRegression(x, y, 0.3, 1E-3, 1000, null);
             
             int error = 0;
             for (int i = 0; i < testx.length; i++) {

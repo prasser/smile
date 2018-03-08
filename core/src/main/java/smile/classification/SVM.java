@@ -87,10 +87,7 @@ import smile.util.MulticoreExecutor;
  * 
  * @author Haifeng Li
  */
-public class SVM <T> implements OnlineClassifier<T>, SoftClassifier<T>, Serializable {
-    private static final long serialVersionUID = 1L;
-    private static final Logger logger = LoggerFactory.getLogger(SVM.class);
-
+public class SVM <T> extends SoftClassifier<T> implements Serializable, OnlineClassifier<T> {
     /**
      * The type of multi-class SVMs.
      */
@@ -104,45 +101,7 @@ public class SVM <T> implements OnlineClassifier<T>, SoftClassifier<T>, Serializ
          * One vs all classification.
          */
         ONE_VS_ALL,
-    };
-
-    /**
-     * The default value for K_tt + K_ss - 2 * K_ts if kernel is not positive.
-     */
-    private static final double TAU = 1E-12;
-    /**
-     * Learned two-class support vector machine.
-     */
-    private LASVM svm;
-    /**
-     * Learned multi-class support vector machines.
-     */
-    private List<LASVM> svms;
-    /**
-     * The kernel function.
-     */
-    private MercerKernel<T> kernel;
-    /**
-     * The dimensionality of instances. Useful for sparse arrays.
-     */
-    private int p;
-    /**
-     * The number of classes;
-     */
-    private int k;
-    /**
-     * The strategy for multi-class classification.
-     */
-    private Multiclass strategy = Multiclass.ONE_VS_ONE;
-    /**
-     * The class weight.
-     */
-    private double[] wi;
-    /**
-     * The tolerance of convergence test.
-     */
-    private double tol = 1E-3;
-    
+    }
     /**
      * Trainer for support vector machines.
      */
@@ -184,26 +143,11 @@ public class SVM <T> implements OnlineClassifier<T>, SoftClassifier<T>, Serializ
         /**
          * Constructor of trainer for binary SVMs.
          * @param kernel the kernel function.
-         * @param C the soft margin penalty parameter.
-         */
-        public Trainer(MercerKernel<T> kernel, double C) {
-            if (C < 0) {
-                throw new IllegalArgumentException("Invalid soft margin penalty: " + C);
-            }
-
-            this.kernel = kernel;
-            this.Cp = C;
-            this.Cn = C;
-            this.k = 2;
-        }
-
-        /**
-         * Constructor of trainer for binary SVMs.
-         * @param kernel the kernel function.
          * @param Cp the soft margin penalty parameter for positive instances.
          * @param Cn the soft margin penalty parameter for negative instances.
          */
-        public Trainer(MercerKernel<T> kernel, double Cp, double Cn) {
+        public Trainer(MercerKernel<T> kernel, double Cp, double Cn, TrainingInterrupt interrupt) {
+            super(interrupt);
             if (Cp < 0) {
                 throw new IllegalArgumentException("Invalid postive instance soft margin penalty: " + Cp);
             }
@@ -222,32 +166,11 @@ public class SVM <T> implements OnlineClassifier<T>, SoftClassifier<T>, Serializ
          * Constructor of trainer for multi-class SVMs.
          * @param kernel the kernel function.
          * @param C the soft margin penalty parameter.
-         * @param k the number of classes.
-         */
-        public Trainer(MercerKernel<T> kernel, double C, int k, Multiclass strategy) {
-            if (C < 0) {
-                throw new IllegalArgumentException("Invalid soft margin penalty: " + C);
-            }
-
-            if (k < 3) {
-                throw new IllegalArgumentException("Invalid number of classes: " + k);
-            }
-
-            this.kernel = kernel;
-            this.Cp = C;
-            this.Cn = C;
-            this.k = k;
-            this.strategy = strategy;
-        }
-
-        /**
-         * Constructor of trainer for multi-class SVMs.
-         * @param kernel the kernel function.
-         * @param C the soft margin penalty parameter.
          * @param weight class weight. Must be positive. The soft margin penalty
          * of class i will be weight[i] * C.
          */
-        public Trainer(MercerKernel<T> kernel, double C, double[] weight, Multiclass strategy) {
+        public Trainer(MercerKernel<T> kernel, double C, double[] weight, Multiclass strategy, TrainingInterrupt interrupt) {
+            super(interrupt);
             if (C < 0) {
                 throw new IllegalArgumentException("Invalid soft margin penalty: " + C);
             }
@@ -265,17 +188,44 @@ public class SVM <T> implements OnlineClassifier<T>, SoftClassifier<T>, Serializ
         }
 
         /**
-         * Sets the tolerance of convergence test.
-         * 
-         * @param tol the tolerance of convergence test.
+         * Constructor of trainer for multi-class SVMs.
+         * @param kernel the kernel function.
+         * @param C the soft margin penalty parameter.
+         * @param k the number of classes.
          */
-        public Trainer<T> setTolerance(double tol) {
-            if (tol <= 0.0) {
-                throw new IllegalArgumentException("Invalid tolerance of convergence test:" + tol);
+        public Trainer(MercerKernel<T> kernel, double C, int k, Multiclass strategy, TrainingInterrupt interrupt) {
+            super(interrupt);
+            if (C < 0) {
+                throw new IllegalArgumentException("Invalid soft margin penalty: " + C);
             }
 
-            this.tol = tol;
-            return this;
+            if (k < 3) {
+                throw new IllegalArgumentException("Invalid number of classes: " + k);
+            }
+
+            this.kernel = kernel;
+            this.Cp = C;
+            this.Cn = C;
+            this.k = k;
+            this.strategy = strategy;
+        }
+
+        /**
+         * Constructor of trainer for binary SVMs.
+         * @param kernel the kernel function.
+         * @param C the soft margin penalty parameter.
+         * @param interrupt
+         */
+        public Trainer(MercerKernel<T> kernel, double C, TrainingInterrupt interrupt) {
+            super(interrupt);
+            if (C < 0) {
+                throw new IllegalArgumentException("Invalid soft margin penalty: " + C);
+            }
+
+            this.kernel = kernel;
+            this.Cp = C;
+            this.Cn = C;
+            this.k = 2;
         }
 
         /**
@@ -288,6 +238,20 @@ public class SVM <T> implements OnlineClassifier<T>, SoftClassifier<T>, Serializ
             }
         
             this.epochs = epochs;
+            return this;
+        }
+
+        /**
+         * Sets the tolerance of convergence test.
+         * 
+         * @param tol the tolerance of convergence test.
+         */
+        public Trainer<T> setTolerance(double tol) {
+            if (tol <= 0.0) {
+                throw new IllegalArgumentException("Invalid tolerance of convergence test:" + tol);
+            }
+
+            this.tol = tol;
             return this;
         }
         
@@ -307,12 +271,12 @@ public class SVM <T> implements OnlineClassifier<T>, SoftClassifier<T>, Serializ
         public SVM<T> train(T[] x, int[] y, double[] weight) {
             SVM<T> svm = null;
             if (k == 2) {
-                svm = new SVM<>(kernel, Cp, Cn);
+                svm = new SVM<>(kernel, Cp, Cn, interrupt);
             } else {
                 if (this.weight == null) {
-                    svm = new SVM<>(kernel, Cp, k, strategy);
+                    svm = new SVM<>(kernel, Cp, k, strategy, interrupt);
                 } else {
-                    svm = new SVM<>(kernel, Cp, this.weight, strategy);
+                    svm = new SVM<>(kernel, Cp, this.weight, strategy, interrupt);
                 }
             }
             
@@ -330,8 +294,6 @@ public class SVM <T> implements OnlineClassifier<T>, SoftClassifier<T>, Serializ
      * Online Two-class SVM.
      */
     final class LASVM implements Serializable {
-        private static final long serialVersionUID = 1L;
-
         /**
          * Support vector.
          */
@@ -371,6 +333,8 @@ public class SVM <T> implements OnlineClassifier<T>, SoftClassifier<T>, Serializ
              */
             DoubleArrayList kcache;
         }
+
+        private static final long serialVersionUID = 1L;
         /**
          * The soft margin penalty parameter for positive samples.
          */
@@ -430,6 +394,99 @@ public class SVM <T> implements OnlineClassifier<T>, SoftClassifier<T>, Serializ
         }
         
         /**
+         * Cleanup kernel cache to free memory.
+         */
+        void cleanup() {
+            nsv = 0;
+            nbsv = 0;
+            for (SupportVector v : sv) {
+                if (v != null) {
+                    nsv++;
+
+                    v.kcache = null;
+                    if (v.alpha == v.cmin || v.alpha == v.cmax) {
+                        nbsv++;
+                    }
+                }
+            }
+
+            logger.info("{} support vectors, {} bounded\n", nsv, nbsv);
+        }
+        
+        void evict() {
+            minmax();
+            
+            for (int i = 0; i < sv.size(); i++) {
+                SupportVector v = sv.get(i);
+                if (v != null && v.alpha == 0) {
+                    if ((v.g >= gmax && 0 >= v.cmax) || (v.g <= gmin && 0 <= v.cmin)) {
+                        sv.set(i, null);
+                    }
+                }
+            }
+        }
+
+        /**
+         * Call reprocess until converge.
+         */
+        void finish() {
+            finish(tol);
+        }
+
+        /**
+         * Call reprocess until converge.
+         * @param epsgr the tolerance of convergence test.
+         */
+        void finish(double epsgr) {
+            logger.info("SVM finializes the training by reprocess.");
+            for (int count = 1; smo(null, null, epsgr); count++) {
+                if (count % 1000 == 0) {
+                    logger.info("finishing {} reprocess iterations.");
+                }
+            }
+            logger.info("SVM finished the reprocess.");
+
+            Iterator<SupportVector> iter = sv.iterator();
+            while (iter.hasNext()) {
+                SupportVector v = iter.next();
+                if (v == null) {
+                    iter.remove();
+                } else if (v.alpha == 0) {
+                    if ((v.g >= gmax && 0 >= v.cmax) || (v.g <= gmin && 0 <= v.cmin)) {
+                        iter.remove();
+                    }
+                }
+            }
+            cleanup();
+
+            if (kernel instanceof LinearKernel) {                
+                w = new double[p];
+
+                for (SupportVector v : sv) {
+                    if (v.x instanceof double[]) {
+                        double[] x = (double[]) v.x;
+
+                        for (int i = 0; i < w.length; i++) {
+                            w[i] += v.alpha * x[i];
+                        }
+
+                    } else if (v.x instanceof int[]) {
+                        int[] x = (int[]) v.x;
+
+                        for (int i = 0; i < x.length; i++) {
+                            w[x[i]] += v.alpha;
+                        }
+
+                    } else if (v.x instanceof SparseArray) {
+                        for (SparseArray.Entry e : (SparseArray) v.x) {
+                            w[e.i] += v.alpha * e.x;
+                        }
+                    }
+                }
+            }
+        }
+
+        /**
          * Trains the SVM with the given dataset for one epoch. The caller may
          * call this method multiple times to obtain better accuracy although
          * one epoch is usually sufficient. After calling this method sufficient
@@ -439,7 +496,7 @@ public class SVM <T> implements OnlineClassifier<T>, SoftClassifier<T>, Serializ
         void learn(T[] x, int[] y) {
             learn(x, y, null);
         }
-        
+
         /**
          * Trains the SVM with the given dataset for one epoch. The caller may
          * call this method multiple times to obtain better accuracy although
@@ -510,6 +567,33 @@ public class SVM <T> implements OnlineClassifier<T>, SoftClassifier<T>, Serializ
                 } while (gmax - gmin > 1000);
             }
         }
+        
+        /**
+         * Find support vectors with smallest (of I_up) and largest (of I_down) gradients.
+         */
+        void minmax() {
+            if (!minmaxflag) {
+                gmin = Double.MAX_VALUE;
+                gmax = -Double.MAX_VALUE;
+
+                for (SupportVector v : sv) {
+                    if (v != null) {
+                        double gi = v.g;
+                        double ai = v.alpha;
+                        if (gi < gmin && ai > v.cmin) {
+                            svmin = v;
+                            gmin = gi;
+                        }
+                        if (gi > gmax && ai < v.cmax) {
+                            svmax = v;
+                            gmax = gi;
+                        }
+                    }
+                }
+                
+                minmaxflag = true;
+            }
+        }
 
         /**
          * Returns the function value after training.
@@ -540,30 +624,116 @@ public class SVM <T> implements OnlineClassifier<T>, SoftClassifier<T>, Serializ
         }
 
         /**
-         * Find support vectors with smallest (of I_up) and largest (of I_down) gradients.
+         * Process a new sample.
          */
-        void minmax() {
-            if (!minmaxflag) {
-                gmin = Double.MAX_VALUE;
-                gmax = -Double.MAX_VALUE;
+        boolean process(T x, int y) {
+            return process(x, y, 1.0);
+        }
 
+        /**
+         * Process a new sample.
+         */
+        boolean process(T x, int y, double weight) {
+            if (y != +1 && y != -1) {
+                throw new IllegalArgumentException("Invalid label: " + y);
+            }
+
+            if (weight <= 0.0) {
+                throw new IllegalArgumentException("Invalid instance weight: " + weight);                
+            }
+            
+            // Compute gradient
+            double g = y;
+            DoubleArrayList kcache = new DoubleArrayList(sv.size() + 1);
+            if (!sv.isEmpty()) {
                 for (SupportVector v : sv) {
                     if (v != null) {
-                        double gi = v.g;
-                        double ai = v.alpha;
-                        if (gi < gmin && ai > v.cmin) {
-                            svmin = v;
-                            gmin = gi;
+                        // Bail out if already in expansion?
+                        if (v.x == x) {
+                            return true;
                         }
-                        if (gi > gmax && ai < v.cmax) {
-                            svmax = v;
-                            gmax = gi;
-                        }
+
+                        double k = kernel.k(v.x, x);
+                        g -= v.alpha * k;
+                        kcache.add(k);
+                    } else {
+                        kcache.add(0.0);
                     }
                 }
-                
-                minmaxflag = true;
+
+                // Decide insertion
+                minmax();
+                if (gmin < gmax) {
+                    if ((y > 0 && g < gmin) || (y < 0 && g > gmax)) {
+                        return false;
+                    }
+                }
             }
+
+            // Insert
+            SupportVector v = new SupportVector();
+            v.x = x;
+            v.y = y;
+            v.alpha = 0.0;
+            v.g = g;
+            v.k = kernel.k(x, x);
+            v.kcache = kcache;
+            if (y > 0) {
+                v.cmin = 0;
+                v.cmax = weight * Cp;
+            } else {
+                v.cmin = -weight * Cn;
+                v.cmax = 0;
+            }
+
+            int i = sv.size();
+            for (; i < sv.size(); i++) {
+                if (sv.get(i) == null) {
+                    sv.set(i, v);
+                    kcache.set(i, v.k);
+
+                    for (int j = 0; j < sv.size(); j++) {
+                        SupportVector v1 = sv.get(j);
+                        if (v1 != null && v1.kcache != null) {
+                            v1.kcache.set(i, kcache.get(j));
+                        }
+                    }
+
+                    break;
+                }
+            }
+
+            if (i >= sv.size()) {
+                for (int j = 0; j < sv.size(); j++) {
+                    SupportVector v1 = sv.get(j);
+                    if (v1 != null && v1.kcache != null) {
+                        v1.kcache.add(kcache.get(j));
+                    }
+                }
+
+                v.kcache.add(v.k);
+                sv.add(v);
+            }
+
+            // Process
+            if (y > 0) {
+                smo(null, v, 0.0);
+            } else {
+                smo(v, null, 0.0);
+            }
+            
+            minmaxflag = false;
+            return true;
+        }
+
+        /**
+         * Reprocess support vectors.
+         * @param epsgr the tolerance of convergence test.
+         */
+        boolean reprocess(double epsgr) {
+            boolean status = smo(null, null, epsgr);
+            evict();
+            return status;
         }
 
         /**
@@ -738,179 +908,6 @@ public class SVM <T> implements OnlineClassifier<T>, SoftClassifier<T>, Serializ
         }
 
         /**
-         * Process a new sample.
-         */
-        boolean process(T x, int y) {
-            return process(x, y, 1.0);
-        }
-        
-        /**
-         * Process a new sample.
-         */
-        boolean process(T x, int y, double weight) {
-            if (y != +1 && y != -1) {
-                throw new IllegalArgumentException("Invalid label: " + y);
-            }
-
-            if (weight <= 0.0) {
-                throw new IllegalArgumentException("Invalid instance weight: " + weight);                
-            }
-            
-            // Compute gradient
-            double g = y;
-            DoubleArrayList kcache = new DoubleArrayList(sv.size() + 1);
-            if (!sv.isEmpty()) {
-                for (SupportVector v : sv) {
-                    if (v != null) {
-                        // Bail out if already in expansion?
-                        if (v.x == x) {
-                            return true;
-                        }
-
-                        double k = kernel.k(v.x, x);
-                        g -= v.alpha * k;
-                        kcache.add(k);
-                    } else {
-                        kcache.add(0.0);
-                    }
-                }
-
-                // Decide insertion
-                minmax();
-                if (gmin < gmax) {
-                    if ((y > 0 && g < gmin) || (y < 0 && g > gmax)) {
-                        return false;
-                    }
-                }
-            }
-
-            // Insert
-            SupportVector v = new SupportVector();
-            v.x = x;
-            v.y = y;
-            v.alpha = 0.0;
-            v.g = g;
-            v.k = kernel.k(x, x);
-            v.kcache = kcache;
-            if (y > 0) {
-                v.cmin = 0;
-                v.cmax = weight * Cp;
-            } else {
-                v.cmin = -weight * Cn;
-                v.cmax = 0;
-            }
-
-            int i = sv.size();
-            for (; i < sv.size(); i++) {
-                if (sv.get(i) == null) {
-                    sv.set(i, v);
-                    kcache.set(i, v.k);
-
-                    for (int j = 0; j < sv.size(); j++) {
-                        SupportVector v1 = sv.get(j);
-                        if (v1 != null && v1.kcache != null) {
-                            v1.kcache.set(i, kcache.get(j));
-                        }
-                    }
-
-                    break;
-                }
-            }
-
-            if (i >= sv.size()) {
-                for (int j = 0; j < sv.size(); j++) {
-                    SupportVector v1 = sv.get(j);
-                    if (v1 != null && v1.kcache != null) {
-                        v1.kcache.add(kcache.get(j));
-                    }
-                }
-
-                v.kcache.add(v.k);
-                sv.add(v);
-            }
-
-            // Process
-            if (y > 0) {
-                smo(null, v, 0.0);
-            } else {
-                smo(v, null, 0.0);
-            }
-            
-            minmaxflag = false;
-            return true;
-        }
-
-        /**
-         * Reprocess support vectors.
-         * @param epsgr the tolerance of convergence test.
-         */
-        boolean reprocess(double epsgr) {
-            boolean status = smo(null, null, epsgr);
-            evict();
-            return status;
-        }
-
-        /**
-         * Call reprocess until converge.
-         */
-        void finish() {
-            finish(tol);
-        }
-
-        /**
-         * Call reprocess until converge.
-         * @param epsgr the tolerance of convergence test.
-         */
-        void finish(double epsgr) {
-            logger.info("SVM finializes the training by reprocess.");
-            for (int count = 1; smo(null, null, epsgr); count++) {
-                if (count % 1000 == 0) {
-                    logger.info("finishing {} reprocess iterations.");
-                }
-            }
-            logger.info("SVM finished the reprocess.");
-
-            Iterator<SupportVector> iter = sv.iterator();
-            while (iter.hasNext()) {
-                SupportVector v = iter.next();
-                if (v == null) {
-                    iter.remove();
-                } else if (v.alpha == 0) {
-                    if ((v.g >= gmax && 0 >= v.cmax) || (v.g <= gmin && 0 <= v.cmin)) {
-                        iter.remove();
-                    }
-                }
-            }
-            cleanup();
-
-            if (kernel instanceof LinearKernel) {                
-                w = new double[p];
-
-                for (SupportVector v : sv) {
-                    if (v.x instanceof double[]) {
-                        double[] x = (double[]) v.x;
-
-                        for (int i = 0; i < w.length; i++) {
-                            w[i] += v.alpha * x[i];
-                        }
-
-                    } else if (v.x instanceof int[]) {
-                        int[] x = (int[]) v.x;
-
-                        for (int i = 0; i < x.length; i++) {
-                            w[x[i]] += v.alpha;
-                        }
-
-                    } else if (v.x instanceof SparseArray) {
-                        for (SparseArray.Entry e : (SparseArray) v.x) {
-                            w[e.i] += v.alpha * e.x;
-                        }
-                    }
-                }
-            }
-        }
-
-        /**
          * After calling finish, the user should call this method
          * to train Platt Scaling to estimate posteriori probabilities.
          *
@@ -925,57 +922,118 @@ public class SVM <T> implements OnlineClassifier<T>, SoftClassifier<T>, Serializ
             }
             platt = new PlattScaling(scores, y);
         }
-
-        void evict() {
-            minmax();
-            
-            for (int i = 0; i < sv.size(); i++) {
-                SupportVector v = sv.get(i);
-                if (v != null && v.alpha == 0) {
-                    if ((v.g >= gmax && 0 >= v.cmax) || (v.g <= gmin && 0 <= v.cmin)) {
-                        sv.set(i, null);
-                    }
-                }
-            }
-        }
-
-        /**
-         * Cleanup kernel cache to free memory.
-         */
-        void cleanup() {
-            nsv = 0;
-            nbsv = 0;
-            for (SupportVector v : sv) {
-                if (v != null) {
-                    nsv++;
-
-                    v.kcache = null;
-                    if (v.alpha == v.cmin || v.alpha == v.cmax) {
-                        nbsv++;
-                    }
-                }
-            }
-
-            logger.info("{} support vectors, {} bounded\n", nsv, nbsv);
-        }
-    }
+    };
 
     /**
-     * Constructor of binary SVM.
-     * @param kernel the kernel function.
-     * @param C the soft margin penalty parameter.
+     * Train Platt Scaling.
      */
-    public SVM(MercerKernel<T> kernel, double C) {
-        this(kernel, C, C);
+    class PlattScalingTask implements Callable<LASVM> {
+        LASVM svm;
+        T[] x;
+        int[] y;
+
+        PlattScalingTask(LASVM svm, T[] x, int[] y) {
+            this.svm = svm;
+            this.x = x;
+            this.y = y;
+        }
+
+        @Override
+        public LASVM call() {
+            svm.trainPlattScaling(x, y);
+            return svm;
+        }
     }
+    /**
+     * Reprocess a LASVM.
+     */
+    class ProcessTask implements Callable<LASVM> {
+        LASVM svm;
+        ProcessTask(LASVM svm) {
+            this.svm = svm;
+        }
+
+        @Override
+        public LASVM call() {
+            svm.finish();
+            return svm;
+        }
+    }
+    /**
+     * Trains a LASVM.
+     */
+    class TrainingTask implements Callable<LASVM> {
+        LASVM svm;
+        T[] x;
+        int[] y;
+        double[] weight; // instance weight
+
+        TrainingTask(LASVM svm, T[] x, int[] y, double[] weight) {
+            this.svm = svm;
+            this.x = x;
+            this.y = y;
+            this.weight = weight;
+        }
+
+        @Override
+        public LASVM call() {
+            svm.learn(x, y, weight);
+            return svm;
+        }
+    }
+    private static final long serialVersionUID = 1L;
+    private static final Logger logger = LoggerFactory.getLogger(SVM.class);
+    /**
+     * The default value for K_tt + K_ss - 2 * K_ts if kernel is not positive.
+     */
+    private static final double TAU = 1E-12;
+    /**
+     * Learned two-class support vector machine.
+     */
+    private LASVM svm;
+    /**
+     * Learned multi-class support vector machines.
+     */
+    private List<LASVM> svms;
+    /**
+     * The kernel function.
+     */
+    private MercerKernel<T> kernel;
+    
+    /**
+     * The dimensionality of instances. Useful for sparse arrays.
+     */
+    private int p;
+
+    /**
+     * The number of classes;
+     */
+    private int k;
+
+    /**
+     * The strategy for multi-class classification.
+     */
+    private Multiclass strategy = Multiclass.ONE_VS_ONE;
+
+    /**
+     * The class weight.
+     */
+    private double[] wi;
+
+    /**
+     * The tolerance of convergence test.
+     */
+    private double tol = 1E-3;
 
     /**
      * Constructor of binary SVM.
      * @param kernel the kernel function.
      * @param Cp the soft margin penalty parameter for positive instances.
      * @param Cn the soft margin penalty parameter for negative instances.
+     * @param interrupt
      */
-    public SVM(MercerKernel<T> kernel, double Cp, double Cn) {
+    public SVM(MercerKernel<T> kernel, double Cp, double Cn, TrainingInterrupt interrupt) {
+        super(interrupt);
         if (Cp < 0.0) {
             throw new IllegalArgumentException("Invalid postive instance soft margin penalty: " + Cp);
         }
@@ -988,49 +1046,17 @@ public class SVM <T> implements OnlineClassifier<T>, SoftClassifier<T>, Serializ
         this.k = 2;
         svm = new LASVM(Cp, Cn);
     }
-
-    /**
-     * Constructor of multi-class SVM.
-     * @param kernel the kernel function.
-     * @param C the soft margin penalty parameter.
-     * @param k the number of classes.
-     */
-    public SVM(MercerKernel<T> kernel, double C, int k, Multiclass strategy) {
-        if (C < 0.0) {
-            throw new IllegalArgumentException("Invalid soft margin penalty: " + C);
-        }
-        
-        if (k < 3) {
-            throw new IllegalArgumentException("Invalid number of classes: " + k);
-        }
-        
-        this.kernel = kernel;
-        this.k = k;
-        this.strategy = strategy;
-        
-        if (strategy == Multiclass.ONE_VS_ALL) {
-            svms = new ArrayList<>(k);
-            for (int i = 0; i < k; i++) {
-                svms.add(new LASVM(C, C));
-            }
-        } else {
-            svms = new ArrayList<>(k * (k - 1) / 2);
-            for (int i = 0; i < k; i++) {
-                for (int j = i + 1; j < k; j++) {
-                    svms.add(new LASVM(C, C));
-                }
-            }
-        }
-    }
-
+    
     /**
      * Constructor of multi-class SVM.
      * @param kernel the kernel function.
      * @param C the soft margin penalty parameter
      * @param weight class weight. Must be positive. The soft margin penalty
      * of class i will be weight[i] * C.
+     * @param interrupt
      */
-    public SVM(MercerKernel<T> kernel, double C, double[] weight, Multiclass strategy) {
+    public SVM(MercerKernel<T> kernel, double C, double[] weight, Multiclass strategy, TrainingInterrupt interrupt) {
+        super(interrupt);
         if (C < 0.0) {
             throw new IllegalArgumentException("Invalid soft margin penalty: " + C);
         }
@@ -1064,19 +1090,79 @@ public class SVM <T> implements OnlineClassifier<T>, SoftClassifier<T>, Serializ
             }
         }
     }
-    
+
     /**
-     * Sets the tolerance of convergence test.
-     * 
-     * @param tol the tolerance of convergence test.
+     * Constructor of multi-class SVM.
+     * @param kernel the kernel function.
+     * @param C the soft margin penalty parameter.
+     * @param k the number of classes.
+     * @param interrupt
      */
-    public SVM<T> setTolerance(double tol) {
-        if (tol <= 0.0) {
-            throw new IllegalArgumentException("Invalid tolerance of convergence test:" + tol);
+    public SVM(MercerKernel<T> kernel, double C, int k, Multiclass strategy, TrainingInterrupt interrupt) {
+        super(interrupt);
+        if (C < 0.0) {
+            throw new IllegalArgumentException("Invalid soft margin penalty: " + C);
         }
         
-        this.tol = tol;
-        return this;
+        if (k < 3) {
+            throw new IllegalArgumentException("Invalid number of classes: " + k);
+        }
+        
+        this.kernel = kernel;
+        this.k = k;
+        this.strategy = strategy;
+        
+        if (strategy == Multiclass.ONE_VS_ALL) {
+            svms = new ArrayList<>(k);
+            for (int i = 0; i < k; i++) {
+                svms.add(new LASVM(C, C));
+            }
+        } else {
+            svms = new ArrayList<>(k * (k - 1) / 2);
+            for (int i = 0; i < k; i++) {
+                for (int j = i + 1; j < k; j++) {
+                    svms.add(new LASVM(C, C));
+                }
+            }
+        }
+    }
+
+    /**
+     * Constructor of binary SVM.
+     * @param kernel the kernel function.
+     * @param C the soft margin penalty parameter.
+     * @param interrupt
+     */
+    public SVM(MercerKernel<T> kernel, double C, TrainingInterrupt interrupt) {
+        this(kernel, C, C, interrupt);
+    }
+
+    /**
+     * Process support vectors until converge.
+     */
+    public void finish() {
+        if (k == 2) {
+            svm.finish();
+        } else {
+            List<ProcessTask> tasks = new ArrayList<>(svms.size());
+            for (LASVM s : svms) {
+                tasks.add(new ProcessTask(s));
+            }
+
+            try {
+                MulticoreExecutor.run(tasks);
+            } catch (Exception e) {
+                logger.error("Failed to train SVM on multi-core", e);
+            }
+        }
+    }
+    
+    /**
+     * Indicates if Platt scaling is available.
+     * @return true if Platt Scaling is available
+     */
+    public boolean hasPlattScaling(){
+        return (svm.platt != null);
     }
 
     @Override
@@ -1146,7 +1232,7 @@ public class SVM <T> implements OnlineClassifier<T>, SoftClassifier<T>, Serializ
     public void learn(T[] x, int[] y) {
         learn(x, y, null);
     }
-    
+
     /**
      * Trains the SVM with the given dataset for one epoch. The caller may
      * call this method multiple times to obtain better accuracy although
@@ -1267,156 +1353,6 @@ public class SVM <T> implements OnlineClassifier<T>, SoftClassifier<T>, Serializ
         }
     }
 
-    /**
-     * Process support vectors until converge.
-     */
-    public void finish() {
-        if (k == 2) {
-            svm.finish();
-        } else {
-            List<ProcessTask> tasks = new ArrayList<>(svms.size());
-            for (LASVM s : svms) {
-                tasks.add(new ProcessTask(s));
-            }
-
-            try {
-                MulticoreExecutor.run(tasks);
-            } catch (Exception e) {
-                logger.error("Failed to train SVM on multi-core", e);
-            }
-        }
-    }
-
-    /**
-     * Indicates if Platt scaling is available.
-     * @return true if Platt Scaling is available
-     */
-    public boolean hasPlattScaling(){
-        return (svm.platt != null);
-    }
-
-    /**
-     * After calling finish, the user should call this method
-     * to train Platt Scaling to estimate posteriori probabilities.
-     *
-     * @param x training samples.
-     * @param y training labels.
-     */
-
-    public void trainPlattScaling(T[] x, int[] y) {
-        if (k == 2) {
-            svm.trainPlattScaling(x, y);
-        } else if (strategy == Multiclass.ONE_VS_ALL) {
-            List<PlattScalingTask> tasks = new ArrayList<>(svms.size());
-
-            for (int m = 0; m < svms.size(); m++) {
-                LASVM s = svms.get(m);
-
-                int l = y.length;
-                int[] yi = new int[l];
-                for (int i = 0; i < l; i++) {
-                    if (y[i] == m)
-                        yi[i] = +1;
-                    else
-                        yi[i] = -1;
-                }
-
-                tasks.add(new PlattScalingTask(s, x, yi));
-            }
-
-            try {
-                MulticoreExecutor.run(tasks);
-            } catch (Exception e) {
-                logger.error("Failed to train Platt Scaling on multi-core", e);
-            }
-        } else {
-            List<PlattScalingTask> tasks = new ArrayList<>(svms.size());
-
-            for (int i = 0, m = 0; i < k; i++) {
-                for (int j = i + 1; j < k; j++, m++) {
-                    LASVM s = svms.get(m);
-
-                    int l = y.length;
-                    int[] yi = new int[l];
-                    for (int p = 0; p < l; p++) {
-                        if (y[p] == i)
-                            yi[p] = +1;
-                        else
-                            yi[p] = -1;
-                    }
-
-                    tasks.add(new PlattScalingTask(s, x, yi));
-                }
-            }
-
-            try {
-                MulticoreExecutor.run(tasks);
-            } catch (Exception e) {
-                logger.error("Failed to train Platt Scaling on multi-core", e);
-            }
-        }
-    }
-
-    /**
-     * Trains a LASVM.
-     */
-    class TrainingTask implements Callable<LASVM> {
-        LASVM svm;
-        T[] x;
-        int[] y;
-        double[] weight; // instance weight
-
-        TrainingTask(LASVM svm, T[] x, int[] y, double[] weight) {
-            this.svm = svm;
-            this.x = x;
-            this.y = y;
-            this.weight = weight;
-        }
-
-        @Override
-        public LASVM call() {
-            svm.learn(x, y, weight);
-            return svm;
-        }
-    }
-
-    /**
-     * Reprocess a LASVM.
-     */
-    class ProcessTask implements Callable<LASVM> {
-        LASVM svm;
-        ProcessTask(LASVM svm) {
-            this.svm = svm;
-        }
-
-        @Override
-        public LASVM call() {
-            svm.finish();
-            return svm;
-        }
-    }
-
-    /**
-     * Train Platt Scaling.
-     */
-    class PlattScalingTask implements Callable<LASVM> {
-        LASVM svm;
-        T[] x;
-        int[] y;
-
-        PlattScalingTask(LASVM svm, T[] x, int[] y) {
-            this.svm = svm;
-            this.x = x;
-            this.y = y;
-        }
-
-        @Override
-        public LASVM call() {
-            svm.trainPlattScaling(x, y);
-            return svm;
-        }
-    }
-
     @Override
     public int predict(T x) {
         if (k == 2) {
@@ -1464,14 +1400,6 @@ public class SVM <T> implements OnlineClassifier<T>, SoftClassifier<T>, Serializ
             
             return label;
         }
-    }
-
-    /** Calculate the posterior probability. */
-    private double posterior(LASVM svm, double y) {
-        final double minProb = 1e-7;
-        final double maxProb = 1 - minProb;
-
-        return Math.min(Math.max(svm.platt.predict(y), minProb), maxProb);
     }
 
     @Override
@@ -1544,5 +1472,89 @@ public class SVM <T> implements OnlineClassifier<T>, SoftClassifier<T>, Serializ
 
             return label;
         }
+    }
+
+    /**
+     * Sets the tolerance of convergence test.
+     * 
+     * @param tol the tolerance of convergence test.
+     */
+    public SVM<T> setTolerance(double tol) {
+        if (tol <= 0.0) {
+            throw new IllegalArgumentException("Invalid tolerance of convergence test:" + tol);
+        }
+        
+        this.tol = tol;
+        return this;
+    }
+
+    /**
+     * After calling finish, the user should call this method
+     * to train Platt Scaling to estimate posteriori probabilities.
+     *
+     * @param x training samples.
+     * @param y training labels.
+     */
+
+    public void trainPlattScaling(T[] x, int[] y) {
+        if (k == 2) {
+            svm.trainPlattScaling(x, y);
+        } else if (strategy == Multiclass.ONE_VS_ALL) {
+            List<PlattScalingTask> tasks = new ArrayList<>(svms.size());
+
+            for (int m = 0; m < svms.size(); m++) {
+                LASVM s = svms.get(m);
+
+                int l = y.length;
+                int[] yi = new int[l];
+                for (int i = 0; i < l; i++) {
+                    if (y[i] == m)
+                        yi[i] = +1;
+                    else
+                        yi[i] = -1;
+                }
+
+                tasks.add(new PlattScalingTask(s, x, yi));
+            }
+
+            try {
+                MulticoreExecutor.run(tasks);
+            } catch (Exception e) {
+                logger.error("Failed to train Platt Scaling on multi-core", e);
+            }
+        } else {
+            List<PlattScalingTask> tasks = new ArrayList<>(svms.size());
+
+            for (int i = 0, m = 0; i < k; i++) {
+                for (int j = i + 1; j < k; j++, m++) {
+                    LASVM s = svms.get(m);
+
+                    int l = y.length;
+                    int[] yi = new int[l];
+                    for (int p = 0; p < l; p++) {
+                        if (y[p] == i)
+                            yi[p] = +1;
+                        else
+                            yi[p] = -1;
+                    }
+
+                    tasks.add(new PlattScalingTask(s, x, yi));
+                }
+            }
+
+            try {
+                MulticoreExecutor.run(tasks);
+            } catch (Exception e) {
+                logger.error("Failed to train Platt Scaling on multi-core", e);
+            }
+        }
+    }
+
+    /** Calculate the posterior probability. */
+    private double posterior(LASVM svm, double y) {
+        final double minProb = 1e-7;
+        final double maxProb = 1 - minProb;
+
+        return Math.min(Math.max(svm.platt.predict(y), minProb), maxProb);
     }
 }

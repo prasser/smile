@@ -94,33 +94,6 @@ import smile.util.SmileUtils;
  * @author Haifeng Li
  */
 public class RBFNetwork<T> implements Classifier<T>, Serializable {
-    private static final long serialVersionUID = 1L;
-
-    /**
-     * The number of classes.
-     */
-    private int k;
-    /**
-     * The centers of RBF functions.
-     */
-    private T[] centers;
-    /**
-     * The linear weights.
-     */
-    private DenseMatrix w;
-    /**
-     * The distance metric functor.
-     */
-    private Metric<T> distance;
-    /**
-     * The radial basis function.
-     */
-    private RadialBasisFunction[] rbf;
-    /**
-     * True to fit a normalized RBF network.
-     */
-    private boolean normalized;
-
     /**
      * Trainer for RBF networks.
      */
@@ -146,9 +119,20 @@ public class RBFNetwork<T> implements Classifier<T>, Serializable {
          * Constructor.
          * 
          * @param distance the distance metric functor.
+         * @param interrupt
          */
-        public Trainer(Metric<T> distance) {
+        public Trainer(Metric<T> distance, TrainingInterrupt interrupt) {
+            super(interrupt);
             this.distance = distance;
+        }
+        
+        /**
+         * Sets true to learn normalized RBF network.
+         * @param normalized true to learn normalized RBF network.
+         */
+        public Trainer<T> setNormalized(boolean normalized) {
+            this.normalized = normalized;
+            return this;
         }
         
         /**
@@ -169,15 +153,6 @@ public class RBFNetwork<T> implements Classifier<T>, Serializable {
         public Trainer<T> setRBF(RadialBasisFunction[] rbf) {
             this.m = rbf.length;
             this.rbf = rbf;
-            return this;
-        }
-        
-        /**
-         * Sets true to learn normalized RBF network.
-         * @param normalized true to learn normalized RBF network.
-         */
-        public Trainer<T> setNormalized(boolean normalized) {
-            this.normalized = normalized;
             return this;
         }
         
@@ -206,19 +181,45 @@ public class RBFNetwork<T> implements Classifier<T>, Serializable {
             return new RBFNetwork<>(x, y, distance, rbf, centers, normalized);
         }
     }
+
+    private static final long serialVersionUID = 1L;
+    /**
+     * Returns an array of radial basis functions initialized with given values.
+     * @param rbf the initial value of array.
+     * @param k the size of array.
+     * @return an array of radial basis functions initialized with given values
+     */
+    private static RadialBasisFunction[] rep(RadialBasisFunction rbf, int k) {
+        RadialBasisFunction[] arr = new RadialBasisFunction[k];
+        Arrays.fill(arr, rbf);
+        return arr;
+    }
+    /**
+     * The number of classes.
+     */
+    private int k;
+    /**
+     * The centers of RBF functions.
+     */
+    private T[] centers;
+    /**
+     * The linear weights.
+     */
+    private DenseMatrix w;
+    /**
+     * The distance metric functor.
+     */
+    private Metric<T> distance;
+
+    /**
+     * The radial basis function.
+     */
+    private RadialBasisFunction[] rbf;
     
     /**
-     * Constructor. Learn a regular RBF network without normalization.
-     * 
-     * @param x training samples.
-     * @param y training labels in [0, k), where k is the number of classes.
-     * @param distance the distance metric functor.
-     * @param rbf the radial basis function.
-     * @param centers the centers of RBF functions.
+     * True to fit a normalized RBF network.
      */
-    public RBFNetwork(T[] x, int[] y, Metric<T> distance, RadialBasisFunction rbf, T[] centers) {
-        this(x, y, distance, rbf, centers, false);
-    }
+    private boolean normalized;
 
     /**
      * Constructor. Learn a regular RBF network without normalization.
@@ -229,7 +230,7 @@ public class RBFNetwork<T> implements Classifier<T>, Serializable {
      * @param rbf the radial basis function.
      * @param centers the centers of RBF functions.
      */
-    public RBFNetwork(T[] x, int[] y, Metric<T> distance, RadialBasisFunction[] rbf, T[] centers) {
+    public RBFNetwork(T[] x, int[] y, Metric<T> distance, RadialBasisFunction rbf, T[] centers) {
         this(x, y, distance, rbf, centers, false);
     }
 
@@ -248,15 +249,16 @@ public class RBFNetwork<T> implements Classifier<T>, Serializable {
     }
     
     /**
-     * Returns an array of radial basis functions initialized with given values.
-     * @param rbf the initial value of array.
-     * @param k the size of array.
-     * @return an array of radial basis functions initialized with given values
+     * Constructor. Learn a regular RBF network without normalization.
+     * 
+     * @param x training samples.
+     * @param y training labels in [0, k), where k is the number of classes.
+     * @param distance the distance metric functor.
+     * @param rbf the radial basis function.
+     * @param centers the centers of RBF functions.
      */
-    private static RadialBasisFunction[] rep(RadialBasisFunction rbf, int k) {
-        RadialBasisFunction[] arr = new RadialBasisFunction[k];
-        Arrays.fill(arr, rbf);
-        return arr;
+    public RBFNetwork(T[] x, int[] y, Metric<T> distance, RadialBasisFunction[] rbf, T[] centers) {
+        this(x, y, distance, rbf, centers, false);
     }
     
     /**

@@ -58,37 +58,7 @@ import smile.validation.ClassificationMeasure;
  * 
  * @author Haifeng Li
  */
-public class AdaBoost implements SoftClassifier<double[]>, Serializable {
-    private static final long serialVersionUID = 1L;
-    private static final Logger logger = LoggerFactory.getLogger(AdaBoost.class);
-    private static final String INVALID_NUMBER_OF_TREES = "Invalid number of trees: ";
-
-    /**
-     * The number of classes.
-     */
-    private int k;
-    /**
-     * Forest of decision trees.
-     */
-    private DecisionTree[] trees;
-    /**
-     * The weight of each decision tree.
-     */
-    private double[] alpha;
-    /**
-     * The weighted error of each decision tree during training.
-     */
-    private double[] error;
-    /**
-     * Variable importance. Every time a split of a node is made on variable
-     * the (GINI, information gain, etc.) impurity criterion for the two
-     * descendent nodes is less than the parent node. Adding up the decreases
-     * for each individual variable over all trees in the forest gives a fast
-     * variable importance that is often very consistent with the permutation
-     * importance measure.
-     */
-    private double[] importance;
-
+public class AdaBoost extends SoftClassifier<double[]> implements Serializable {
     /**
      * Trainer for AdaBoost classifiers.
      */
@@ -101,26 +71,6 @@ public class AdaBoost implements SoftClassifier<double[]>, Serializable {
          * The maximum number of leaf nodes in the tree.
          */
         private int maxNodes = 2;
-
-        /**
-         * Default constructor of 500 trees and maximal 2 leaf nodes in the tree.
-         */
-        public Trainer() {
-
-        }
-
-        /**
-         * Constructor.
-         * 
-         * @param ntrees the number of trees.
-         */
-        public Trainer(int ntrees) {
-            if (ntrees < 1) {
-                throw new IllegalArgumentException(INVALID_NUMBER_OF_TREES + ntrees);
-            }
-
-            this.ntrees = ntrees;
-        }
 
         /**
          * Constructor.
@@ -137,18 +87,28 @@ public class AdaBoost implements SoftClassifier<double[]>, Serializable {
 
             this.ntrees = ntrees;
         }
-        
+
         /**
-         * Sets the number of trees in the random forest.
+         * Constructor.
+         * 
          * @param ntrees the number of trees.
+         * @param interrupt
          */
-        public Trainer setNumTrees(int ntrees) {
+        public Trainer(int ntrees, TrainingInterrupt interrupt) {
+            super(interrupt);
             if (ntrees < 1) {
                 throw new IllegalArgumentException(INVALID_NUMBER_OF_TREES + ntrees);
             }
 
             this.ntrees = ntrees;
-            return this;
+        }
+
+        /**
+         * Default constructor of 500 trees and maximal 2 leaf nodes in the tree.
+         * @param interrupt
+         */
+        public Trainer(TrainingInterrupt interrupt) {
+            super(interrupt);
         }
         
         /**
@@ -164,35 +124,55 @@ public class AdaBoost implements SoftClassifier<double[]>, Serializable {
             return this;
         }
         
+        /**
+         * Sets the number of trees in the random forest.
+         * @param ntrees the number of trees.
+         */
+        public Trainer setNumTrees(int ntrees) {
+            if (ntrees < 1) {
+                throw new IllegalArgumentException(INVALID_NUMBER_OF_TREES + ntrees);
+            }
+
+            this.ntrees = ntrees;
+            return this;
+        }
+        
         @Override
         public AdaBoost train(double[][] x, int[] y) {
             return new AdaBoost(attributes, x, y, ntrees, maxNodes);
         }
     }
+    private static final long serialVersionUID = 1L;
+    private static final Logger logger = LoggerFactory.getLogger(AdaBoost.class);
+
+    private static final String INVALID_NUMBER_OF_TREES = "Invalid number of trees: ";
+    /**
+     * The number of classes.
+     */
+    private int k;
+    /**
+     * Forest of decision trees.
+     */
+    private DecisionTree[] trees;
+    /**
+     * The weight of each decision tree.
+     */
+    private double[] alpha;
+    /**
+     * The weighted error of each decision tree during training.
+     */
+    private double[] error;
+
+    /**
+     * Variable importance. Every time a split of a node is made on variable
+     * the (GINI, information gain, etc.) impurity criterion for the two
+     * descendent nodes is less than the parent node. Adding up the decreases
+     * for each individual variable over all trees in the forest gives a fast
+     * variable importance that is often very consistent with the permutation
+     * importance measure.
+     */
+    private double[] importance;
     
-    /**
-     * Constructor. Learns AdaBoost with decision stumps.
-     *
-     * @param x the training instances. 
-     * @param y the response variable.
-     * @param ntrees the number of trees.
-     */
-    public AdaBoost(double[][] x, int[] y, int ntrees) {
-        this(null, x, y, ntrees);
-    }
-
-    /**
-     * Constructor. Learns AdaBoost with decision trees.
-     *
-     * @param x the training instances. 
-     * @param y the response variable.
-     * @param ntrees the number of trees.
-     * @param maxNodes the maximum number of leaf nodes in the trees.
-     */
-    public AdaBoost(double[][] x, int[] y, int ntrees, int maxNodes) {
-        this(null, x, y, ntrees, maxNodes);
-    }
-
     /**
      * Constructor. Learns AdaBoost with decision stumps.
      *
@@ -204,6 +184,7 @@ public class AdaBoost implements SoftClassifier<double[]>, Serializable {
     public AdaBoost(Attribute[] attributes, double[][] x, int[] y, int ntrees) {
         this(attributes, x, y, ntrees, 2);
     }
+
     /**
      * Constructor.
      *
@@ -214,6 +195,9 @@ public class AdaBoost implements SoftClassifier<double[]>, Serializable {
      * @param maxNodes the maximum number of leaf nodes in the trees.
      */
     public AdaBoost(Attribute[] attributes, double[][] x, int[] y, int ntrees, int maxNodes) {
+        
+        super(null);
+        
         if (x.length != y.length) {
             throw new IllegalArgumentException(String.format("The sizes of X and Y don't match: %d != %d", x.length, y.length));
         }
@@ -282,7 +266,7 @@ public class AdaBoost implements SoftClassifier<double[]>, Serializable {
                 samples[s]++;
             }
             
-            trees[t] = new DecisionTree(attributes, x, y, maxNodes, 1, x[0].length, DecisionTree.SplitRule.GINI, samples, order);
+            trees[t] = new DecisionTree(attributes, x, y, maxNodes, 1, x[0].length, DecisionTree.SplitRule.GINI, samples, order, super.getInterrupt());
             
             for (int i = 0; i < n; i++) {
                 err[i] = trees[t].predict(x[i]) != y[i];
@@ -328,6 +312,35 @@ public class AdaBoost implements SoftClassifier<double[]>, Serializable {
     }
 
     /**
+     * Constructor. Learns AdaBoost with decision stumps.
+     *
+     * @param x the training instances. 
+     * @param y the response variable.
+     * @param ntrees the number of trees.
+     */
+    public AdaBoost(double[][] x, int[] y, int ntrees) {
+        this(null, x, y, ntrees);
+    }
+    /**
+     * Constructor. Learns AdaBoost with decision trees.
+     *
+     * @param x the training instances. 
+     * @param y the response variable.
+     * @param ntrees the number of trees.
+     * @param maxNodes the maximum number of leaf nodes in the trees.
+     */
+    public AdaBoost(double[][] x, int[] y, int ntrees, int maxNodes) {
+        this(null, x, y, ntrees, maxNodes);
+    }
+
+    /**
+     * Returns the decision trees.
+     */
+    public DecisionTree[] getTrees() {
+        return trees;
+    }
+    
+    /**
      * Returns the variable importance. Every time a split of a node is made
      * on variable the (GINI, information gain, etc.) impurity criterion for
      * the two descendent nodes is less than the parent node. Adding up the
@@ -338,39 +351,6 @@ public class AdaBoost implements SoftClassifier<double[]>, Serializable {
      */
     public double[] importance() {
         return importance;
-    }
-    
-    /**
-     * Returns the number of trees in the model.
-     * 
-     * @return the number of trees in the model 
-     */
-    public int size() {
-        return trees.length;
-    }
-    
-    /**
-     * Trims the tree model set to a smaller size in case of over-fitting.
-     * Or if extra decision trees in the model don't improve the performance,
-     * we may remove them to reduce the model size and also improve the speed of
-     * prediction.
-     * 
-     * @param ntrees the new (smaller) size of tree model set.
-     */
-    public void trim(int ntrees) {
-        if (ntrees > trees.length) {
-            throw new IllegalArgumentException("The new model size is larger than the current size.");
-        }
-        
-        if (ntrees <= 0) {
-            throw new IllegalArgumentException("Invalid new model size: " + ntrees);
-        }
-        
-        if (ntrees < trees.length) {
-            trees = Arrays.copyOf(trees, ntrees);
-            alpha = Arrays.copyOf(alpha, ntrees);
-            error = Arrays.copyOf(error, ntrees);
-        }
     }
     
     @Override
@@ -402,6 +382,15 @@ public class AdaBoost implements SoftClassifier<double[]>, Serializable {
         }
 
         return Math.whichMax(posteriori);
+    }
+    
+    /**
+     * Returns the number of trees in the model.
+     * 
+     * @return the number of trees in the model 
+     */
+    public int size() {
+        return trees.length;
     }
     
     /**
@@ -491,10 +480,27 @@ public class AdaBoost implements SoftClassifier<double[]>, Serializable {
     }
 
     /**
-     * Returns the decision trees.
+     * Trims the tree model set to a smaller size in case of over-fitting.
+     * Or if extra decision trees in the model don't improve the performance,
+     * we may remove them to reduce the model size and also improve the speed of
+     * prediction.
+     * 
+     * @param ntrees the new (smaller) size of tree model set.
      */
-    public DecisionTree[] getTrees() {
-        return trees;
+    public void trim(int ntrees) {
+        if (ntrees > trees.length) {
+            throw new IllegalArgumentException("The new model size is larger than the current size.");
+        }
+        
+        if (ntrees <= 0) {
+            throw new IllegalArgumentException("Invalid new model size: " + ntrees);
+        }
+        
+        if (ntrees < trees.length) {
+            trees = Arrays.copyOf(trees, ntrees);
+            alpha = Arrays.copyOf(alpha, ntrees);
+            error = Arrays.copyOf(error, ntrees);
+        }
     }
 }
 

@@ -67,7 +67,7 @@ public class KNNTest {
             double[][] x = iris.toArray(new double[0][]);
             int[] y = iris.toArray(new int[0]);
 
-            KNN<double[]> knn = KNN.learn(x, y, 1);
+            KNN<double[]> knn = KNN.learn(x, y, 1, null);
             int error = 0;
             for (int i = 0; i < x.length; i++) {
                 if (knn.predict(x[i]) != y[i]) {
@@ -77,7 +77,7 @@ public class KNNTest {
             System.out.println("1-nn error = " + error);
             assertEquals(6, error);
 
-            knn = KNN.learn(x, y, 3);
+            knn = KNN.learn(x, y, 3, null);
             error = 0;
             for (int i = 0; i < x.length; i++) {
                 if (knn.predict(x[i]) != y[i]) {
@@ -87,7 +87,7 @@ public class KNNTest {
             System.out.println("3-nn error = " + error);
             assertEquals(6, error);
 
-            knn = KNN.learn(x, y, 5);
+            knn = KNN.learn(x, y, 5, null);
             error = 0;
             for (int i = 0; i < x.length; i++) {
                 if (knn.predict(x[i]) != y[i]) {
@@ -97,7 +97,7 @@ public class KNNTest {
             System.out.println("5-nn error = " + error);
             assertEquals(5, error);
 
-            knn = KNN.learn(x, y, 7);
+            knn = KNN.learn(x, y, 7, null);
             error = 0;
             for (int i = 0; i < x.length; i++) {
                 if (knn.predict(x[i]) != y[i]) {
@@ -107,7 +107,7 @@ public class KNNTest {
             System.out.println("7-nn error = " + error);
             assertEquals(5, error);
 
-            knn = KNN.learn(x, y, 9);
+            knn = KNN.learn(x, y, 9, null);
             error = 0;
             for (int i = 0; i < x.length; i++) {
                 if (knn.predict(x[i]) != y[i]) {
@@ -117,7 +117,7 @@ public class KNNTest {
             System.out.println("9-nn error = " + error);
             assertEquals(5, error);
 
-            knn = KNN.learn(x, y, 11);
+            knn = KNN.learn(x, y, 11, null);
             error = 0;
             for (int i = 0; i < x.length; i++) {
                 if (knn.predict(x[i]) != y[i]) {
@@ -127,7 +127,7 @@ public class KNNTest {
             System.out.println("11-nn error = " + error);
             assertEquals(4, error);
 
-            knn = KNN.learn(x, y, 13);
+            knn = KNN.learn(x, y, 13, null);
             error = 0;
             for (int i = 0; i < x.length; i++) {
                 if (knn.predict(x[i]) != y[i]) {
@@ -137,7 +137,7 @@ public class KNNTest {
             System.out.println("13-nn error = " + error);
             assertEquals(5, error);
 
-            knn = KNN.learn(x, y, 15);
+            knn = KNN.learn(x, y, 15, null);
             error = 0;
             for (int i = 0; i < x.length; i++) {
                 if (knn.predict(x[i]) != y[i]) {
@@ -168,7 +168,7 @@ public class KNNTest {
             double[][] testx = test.toArray(new double[0][]);
             int[] testy = test.toArray(new int[0]);
             
-            KNN<double[]> knn = KNN.learn(x, y);
+            KNN<double[]> knn = KNN.learn(x, y, null);
 
             int error = 0;
             for (int i = 0; i < testx.length; i++) {
@@ -201,7 +201,7 @@ public class KNNTest {
             double[][] testx = test.toArray(new double[test.size()][]);
             int[] testy = test.toArray(new int[test.size()]);
             
-            KNN<double[]> knn = KNN.learn(x, y);
+            KNN<double[]> knn = KNN.learn(x, y, null);
             
             int error = 0;
             for (int i = 0; i < testx.length; i++) {

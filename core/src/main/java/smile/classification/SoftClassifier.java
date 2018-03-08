@@ -24,7 +24,19 @@ package smile.classification;
  *
  * @author Haifeng Li
  */
-public interface SoftClassifier<T> extends Classifier<T> {
+public abstract class SoftClassifier<T> implements Classifier<T> {
+    
+    /** Interrupt*/
+    private final TrainingInterrupt interrupt;
+    
+    /**
+     * Creates a new instance
+     * @param interrupt
+     */
+    public SoftClassifier(TrainingInterrupt interrupt) {
+        this.interrupt = interrupt;
+    }
+    
     /**
      * Predicts the class label of an instance and also calculate a posteriori
      * probabilities. Classifiers may NOT support this method since not all
@@ -35,6 +47,24 @@ public interface SoftClassifier<T> extends Classifier<T> {
      * @param posteriori the array to store a posteriori probabilities on output.
      * @return the predicted class label
      */
-    public int predict(T x, double[] posteriori);
+    public abstract int predict(T x, double[] posteriori);
+    
+    /**
+     * Checks for interrupts
+     * @throws InterruptedException 
+     */
+    protected void interrupt() throws TrainingInterruptedException {
+        if (this.interrupt != null && this.interrupt.interrupt) {
+            throw new TrainingInterruptedException();
+        }
+    }
+
+    /**
+     * Returns the interrupt flag
+     * @return
+     */
+    TrainingInterrupt getInterrupt() {
+        return this.interrupt;
+    }
 
 }

@@ -80,7 +80,7 @@ public class GradientTreeBoostTest {
             for (int i = 0; i < n; i++) {
                 double[][] trainx = Math.slice(x, loocv.train[i]);
                 int[] trainy = Math.slice(y, loocv.train[i]);
-                GradientTreeBoost boost = new GradientTreeBoost(iris.attributes(), trainx, trainy, 100);
+                GradientTreeBoost boost = new GradientTreeBoost(iris.attributes(), trainx, trainy, 100, null);
 
                 if (y[loocv.test[i]] != boost.predict(x[loocv.test[i]]))
                     error++;
@@ -111,7 +111,7 @@ public class GradientTreeBoostTest {
             for (int i = 0; i < n; i++) {
                 double[][] trainx = Math.slice(x, loocv.train[i]);
                 int[] trainy = Math.slice(y, loocv.train[i]);
-                GradientTreeBoost boost = new GradientTreeBoost(iris.attributes(), trainx, trainy, 100);
+                GradientTreeBoost boost = new GradientTreeBoost(iris.attributes(), trainx, trainy, 100, null);
 
                 if (y[loocv.test[i]] != boost.predict(x[loocv.test[i]]))
                     error++;
@@ -141,7 +141,7 @@ public class GradientTreeBoostTest {
             double[][] testx = test.toArray(new double[test.size()][]);
             int[] testy = test.toArray(new int[test.size()]);
 
-            GradientTreeBoost boost = new GradientTreeBoost(train.attributes(), x, y, 100);
+            GradientTreeBoost boost = new GradientTreeBoost(train.attributes(), x, y, 100, null);
             
             int error = 0;
             for (int i = 0; i < testx.length; i++) {
@@ -174,7 +174,7 @@ public class GradientTreeBoostTest {
             double[][] testx = test.toArray(new double[test.size()][]);
             int[] testy = test.toArray(new int[test.size()]);
             
-            GradientTreeBoost boost = new GradientTreeBoost(train.attributes(), x, y, 100);
+            GradientTreeBoost boost = new GradientTreeBoost(train.attributes(), x, y, 100, null);
             
             int error = 0;
             for (int i = 0; i < testx.length; i++) {
@@ -228,7 +228,7 @@ public class GradientTreeBoostTest {
                 }
             }
             
-            GradientTreeBoost boost = new GradientTreeBoost(train.attributes(), x, y, 100);
+            GradientTreeBoost boost = new GradientTreeBoost(train.attributes(), x, y, 100, null);
             
             int error = 0;
             for (int i = 0; i < testx.length; i++) {

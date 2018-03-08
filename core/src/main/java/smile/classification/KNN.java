@@ -68,26 +68,7 @@ import smile.neighbor.Neighbor;
  * 
  * @author Haifeng Li
  */
-public class KNN<T> implements SoftClassifier<T>, Serializable {
-    private static final long serialVersionUID = 1L;
-
-    /**
-     * The data structure for nearest neighbor search.
-     */
-    private KNNSearch<T, T> knn;
-    /**
-     * The labels of training samples.
-     */
-    private int[] y;
-    /**
-     * The number of neighbors for decision.
-     */
-    private int k;
-    /**
-     * The number of classes.
-     */
-    private int c;
-
+public class KNN<T> extends SoftClassifier<T> implements Serializable {
     /**
      * Trainer for KNN classifier.
      */
@@ -106,8 +87,10 @@ public class KNN<T> implements SoftClassifier<T>, Serializable {
          * 
          * @param distance the distance metric functor.
          * @param k the number of neighbors.
+         * @param interrupt
          */
-        public Trainer(Distance<T> distance, int k) {
+        public Trainer(Distance<T> distance, int k, TrainingInterrupt interrupt) {
+            super(interrupt);
             if (k < 1) {
                 throw new IllegalArgumentException("Invalid k of k-NN: " + k);
             }
@@ -118,17 +101,74 @@ public class KNN<T> implements SoftClassifier<T>, Serializable {
         
         @Override
         public KNN<T> train(T[] x, int[] y) {
-            return new KNN<>(x, y, distance, k);
+            return new KNN<>(x, y, distance, k, interrupt);
         }
     }
+
+    private static final long serialVersionUID = 1L;
+    /**
+     * Learn the K-NN classifier from data of type double[].
+     * @param k the number of neighbors for classification.
+     * @param x training samples.
+     * @param y training labels in [0, c), where c is the number of classes.
+     * @param interrupt
+     */
+    public static KNN<double[]> learn(double[][] x, int[] y, int k, TrainingInterrupt interrupt) {
+        if (x.length != y.length) {
+            throw new IllegalArgumentException(String.format("The sizes of X and Y don't match: %d != %d", x.length, y.length));
+        }
+
+        if (k < 1) {
+            throw new IllegalArgumentException("Illegal k = " + k);
+        }
+
+        KNNSearch<double[], double[]> knn = null;
+        if (x[0].length < 10) {
+            knn = new KDTree<>(x, x);
+        } else {
+            knn = new CoverTree<>(x, new EuclideanDistance());
+        }
+        
+        return new KNN<>(knn, y, k, interrupt);
+    }
+    /**
+     * Learn the 1-NN classifier from data of type double[].
+     * @param x the training samples.
+     * @param y training labels in [0, c), where c is the number of classes.
+     * @param interrupt
+     */
+    public static KNN<double[]> learn(double[][] x, int[] y, TrainingInterrupt interrupt) {
+        return learn(x, y, 1, interrupt);
+    }
+    /**
+     * The data structure for nearest neighbor search.
+     */
+    private KNNSearch<T, T> knn;
+
+    /**
+     * The labels of training samples.
+     */
+    private int[] y;
     
+    /**
+     * The number of neighbors for decision.
+     */
+    private int k;
+
+    /**
+     * The number of classes.
+     */
+    private int c;
+
     /**
      * Constructor.
      * @param knn k-nearest neighbor search data structure of training instances.
      * @param y training labels in [0, c), where c is the number of classes.
      * @param k the number of neighbors for classification.
+     * @param interrupt
      */
-    public KNN(KNNSearch<T, T> knn, int[] y, int k) {
+    public KNN(KNNSearch<T, T> knn, int[] y, int k, TrainingInterrupt interrupt) {
+        super(interrupt);
         this.knn = knn;
         this.k = k;
         this.y = y;
@@ -154,24 +194,16 @@ public class KNN<T> implements SoftClassifier<T>, Serializable {
     }
 
     /**
-     * Constructor. By default, this is a 1-NN classifier.
-     * @param x training samples.
-     * @param y training labels in [0, c), where c is the number of classes.
-     * @param distance the distance measure for finding nearest neighbors.
-     */
-    public KNN(T[] x, int[] y, Distance<T> distance) {
-        this(x, y, distance, 1);
-    }
-
-    /**
      * Learn the K-NN classifier from data of any generalized type with a given
      * distance definition.
      * @param k the number of neighbors for classification.
      * @param x training samples.
      * @param y training labels in [0, c), where c is the number of classes.
      * @param distance the distance measure for finding nearest neighbors.
+     * @param interrupt
      */
-    public KNN(T[] x, int[] y, Distance<T> distance, int k) {
+    public KNN(T[] x, int[] y, Distance<T> distance, int k, TrainingInterrupt interrupt) {
+        super(interrupt);
         if (x.length != y.length) {
             throw new IllegalArgumentException(String.format("The sizes of X and Y don't match: %d != %d", x.length, y.length));
         }
@@ -209,37 +241,14 @@ public class KNN<T> implements SoftClassifier<T>, Serializable {
     }
 
     /**
-     * Learn the 1-NN classifier from data of type double[].
-     * @param x the training samples.
-     * @param y training labels in [0, c), where c is the number of classes.
-     */
-    public static KNN<double[]> learn(double[][] x, int[] y) {
-        return learn(x, y, 1);
-    }
-
-    /**
-     * Learn the K-NN classifier from data of type double[].
-     * @param k the number of neighbors for classification.
+     * Constructor. By default, this is a 1-NN classifier.
      * @param x training samples.
      * @param y training labels in [0, c), where c is the number of classes.
+     * @param distance the distance measure for finding nearest neighbors.
+     * @param interrupt
      */
-    public static KNN<double[]> learn(double[][] x, int[] y, int k) {
-        if (x.length != y.length) {
-            throw new IllegalArgumentException(String.format("The sizes of X and Y don't match: %d != %d", x.length, y.length));
-        }
-
-        if (k < 1) {
-            throw new IllegalArgumentException("Illegal k = " + k);
-        }
-
-        KNNSearch<double[], double[]> knn = null;
-        if (x[0].length < 10) {
-            knn = new KDTree<>(x, x);
-        } else {
-            knn = new CoverTree<>(x, new EuclideanDistance());
-        }
-        
-        return new KNN<>(knn, y, k);
+    public KNN(T[] x, int[] y, Distance<T> distance, TrainingInterrupt interrupt) {
+        this(x, y, distance, 1, interrupt);
     }
 
     @Override

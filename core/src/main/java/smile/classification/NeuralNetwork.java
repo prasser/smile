@@ -104,25 +104,7 @@ import java.io.Serializable;
  * 
  * @author Haifeng Li
  */
-public class NeuralNetwork implements OnlineClassifier<double[]>, SoftClassifier<double[]>, Serializable {
-    private static final long serialVersionUID = 1L;
-    private static final Logger logger = LoggerFactory.getLogger(NeuralNetwork.class);
-
-    /**
-     * The types of error functions.
-     */
-    public enum ErrorFunction {
-        /**
-         * Least mean squares error function.
-         */
-        LEAST_MEAN_SQUARES,
-
-        /**
-         * Cross entropy error function for output as probabilities.
-         */
-        CROSS_ENTROPY
-    }
-
+public class NeuralNetwork extends SoftClassifier<double[]> implements Serializable, OnlineClassifier<double[]> {
     /**
      * The types of activation functions in output layer. In this implementation,
      * the hidden layers always employs logistic sigmoid activation function.
@@ -148,79 +130,20 @@ public class NeuralNetwork implements OnlineClassifier<double[]>, SoftClassifier
          */
         SOFTMAX
     }
-
-
     /**
-     * A layer of a feed forward neural network.
+     * The types of error functions.
      */
-    private class Layer {
+    public enum ErrorFunction {
+        /**
+         * Least mean squares error function.
+         */
+        LEAST_MEAN_SQUARES,
 
         /**
-         * number of units in this layer
+         * Cross entropy error function for output as probabilities.
          */
-        int units;
-        /**
-         * output of i<i>th</i> unit
-         */
-        double[] output;
-        /** 
-         * error term of i<i>th</i> unit
-         */
-        double[] error;
-        /** 
-         * connection weights to i<i>th</i> unit from previous layer
-         */
-        double[][] weight;
-        /**
-         * last weight changes for momentum
-         */
-        double[][] delta;
+        CROSS_ENTROPY
     }
-
-    /**
-     * The type of error function of network.
-     */
-    private ErrorFunction errorFunction = ErrorFunction.LEAST_MEAN_SQUARES;
-    /**
-     * The type of activation function in output layer.
-     */
-    private ActivationFunction activationFunction = ActivationFunction.LOGISTIC_SIGMOID;
-    /**
-     * The dimensionality of data.
-     */
-    private int p;
-    /**
-     * The number of classes.
-     */
-    private int k;
-    /**
-     * layers of this net
-     */
-    private Layer[] net;
-    /**
-     * input layer
-     */
-    private Layer inputLayer;
-    /**
-     * output layer
-     */
-    private Layer outputLayer;
-    /**
-     * learning rate
-     */
-    private double eta = 0.1;
-    /**
-     * momentum factor
-     */
-    private double alpha = 0.0;
-    /**
-     * weight decay factor, which is also a regularization term.
-     */
-    private double lambda = 0.0;
-    /**
-     * The buffer to store target value of training instance.
-     */
-    private double[] target;
 
     /**
      * Trainer for neural networks.
@@ -256,25 +179,15 @@ public class NeuralNetwork implements OnlineClassifier<double[]>, SoftClassifier
         private int epochs = 25;
 
         /**
-         * Constructor. The activation function of output layer will be chosen
-         * by natural pairing based on the error function and the number of
-         * classes.
-         * 
-         * @param error the error function.
-         * @param numUnits the number of units in each layer.
-         */
-        public Trainer(ErrorFunction error, int... numUnits) {
-            this(error, natural(error, numUnits[numUnits.length-1]), numUnits);
-        }
-        
-        /**
          * Constructor.
          * 
          * @param error the error function.
          * @param activation the activation function of output layer.
+         * @param interrupt
          * @param numUnits the number of units in each layer.
          */
-        public Trainer(ErrorFunction error, ActivationFunction activation, int... numUnits) {
+        public Trainer(ErrorFunction error, ActivationFunction activation, TrainingInterrupt interrupt, int... numUnits) {
+            super(interrupt);
             int numLayers = numUnits.length;
             if (numLayers < 2) {
                 throw new IllegalArgumentException("Invalid number of layers: " + numLayers);
@@ -312,6 +225,19 @@ public class NeuralNetwork implements OnlineClassifier<double[]>, SoftClassifier
         }
         
         /**
+         * Constructor. The activation function of output layer will be chosen
+         * by natural pairing based on the error function and the number of
+         * classes.
+         * 
+         * @param error the error function.
+         * @param interrupt
+         * @param numUnits the number of units in each layer.
+         */
+        public Trainer(ErrorFunction error, TrainingInterrupt interrupt, int... numUnits) {
+            this(error, natural(error, numUnits[numUnits.length-1]), interrupt, numUnits);
+        }
+        
+        /**
          * Sets the learning rate.
          * @param eta the learning rate.
          */
@@ -337,6 +263,19 @@ public class NeuralNetwork implements OnlineClassifier<double[]>, SoftClassifier
         }
 
         /**
+         * Sets the number of epochs of stochastic learning.
+         * @param epochs the number of epochs of stochastic learning.
+         */
+        public Trainer setNumEpochs(int epochs) {
+            if (epochs < 1) {
+                throw new IllegalArgumentException("Invalid numer of epochs of stochastic learning:" + epochs);
+            }
+        
+            this.epochs = epochs;
+            return this;
+        }
+
+        /**
          * Sets the weight decay factor. After each weight update, every weight
          * is simply ''decayed'' or shrunk according w = w * (1 - eta * lambda).
          * @param lambda the weight decay for regularization.
@@ -349,23 +288,10 @@ public class NeuralNetwork implements OnlineClassifier<double[]>, SoftClassifier
             this.lambda = lambda;
             return this;
         }
-
-        /**
-         * Sets the number of epochs of stochastic learning.
-         * @param epochs the number of epochs of stochastic learning.
-         */
-        public Trainer setNumEpochs(int epochs) {
-            if (epochs < 1) {
-                throw new IllegalArgumentException("Invalid numer of epochs of stochastic learning:" + epochs);
-            }
-        
-            this.epochs = epochs;
-            return this;
-        }
         
         @Override
         public NeuralNetwork train(double[][] x, int[] y) {
-            NeuralNetwork net = new NeuralNetwork(errorFunction, activationFunction, numUnits);
+            NeuralNetwork net = new NeuralNetwork(errorFunction, activationFunction, interrupt, numUnits);
             net.setLearningRate(eta);
             net.setMomentum(alpha);
             net.setWeightDecay(lambda);
@@ -378,19 +304,50 @@ public class NeuralNetwork implements OnlineClassifier<double[]>, SoftClassifier
             return net;
         }
     }
-    
+
     /**
-     * Constructor. The activation function of output layer will be chosen
-     * by natural pairing based on the error function and the number of
-     * classes.
-     * 
-     * @param error the error function.
-     * @param numUnits the number of units in each layer.
+     * A layer of a feed forward neural network.
      */
-    public NeuralNetwork(ErrorFunction error, int... numUnits) {
-        this(error, natural(error, numUnits[numUnits.length-1]), numUnits);
+    private class Layer {
+
+        /**
+         * number of units in this layer
+         */
+        int units;
+        /**
+         * output of i<i>th</i> unit
+         */
+        double[] output;
+        /** 
+         * error term of i<i>th</i> unit
+         */
+        double[] error;
+        /** 
+         * connection weights to i<i>th</i> unit from previous layer
+         */
+        double[][] weight;
+        /**
+         * last weight changes for momentum
+         */
+        double[][] delta;
     }
 
+
+    private static final long serialVersionUID = 1L;
+
+    private static final Logger logger = LoggerFactory.getLogger(NeuralNetwork.class);
+    /**
+     * Returns natural log without underflow.
+     */
+    private static double log(double x) {
+        double y = 0.0;
+        if (x < 1E-300) {
+            y = -690.7755;
+        } else {
+            y = Math.log(x);
+        }
+        return y;
+    }
     /**
      * Returns the activation function of output layer based on natural pairing.
      * @param error the error function.
@@ -409,15 +366,64 @@ public class NeuralNetwork implements OnlineClassifier<double[]>, SoftClassifier
         }
         
     }
+    /**
+     * The type of error function of network.
+     */
+    private ErrorFunction errorFunction = ErrorFunction.LEAST_MEAN_SQUARES;
+    /**
+     * The type of activation function in output layer.
+     */
+    private ActivationFunction activationFunction = ActivationFunction.LOGISTIC_SIGMOID;
+    /**
+     * The dimensionality of data.
+     */
+    private int p;
+    /**
+     * The number of classes.
+     */
+    private int k;
+    /**
+     * layers of this net
+     */
+    private Layer[] net;
+    /**
+     * input layer
+     */
+    private Layer inputLayer;
+    /**
+     * output layer
+     */
+    private Layer outputLayer;
+    /**
+     * learning rate
+     */
+    private double eta = 0.1;
+
+    /**
+     * momentum factor
+     */
+    private double alpha = 0.0;
+    
+    /**
+     * weight decay factor, which is also a regularization term.
+     */
+    private double lambda = 0.0;
+
+    /**
+     * The buffer to store target value of training instance.
+     */
+    private double[] target;
     
     /**
      * Constructor.
      * 
      * @param error the error function.
      * @param activation the activation function of output layer.
+     * @param interrupt
      * @param numUnits the number of units in each layer.
      */
-    public NeuralNetwork(ErrorFunction error, ActivationFunction activation, int... numUnits) {
+    public NeuralNetwork(ErrorFunction error, ActivationFunction activation, TrainingInterrupt interrupt, int... numUnits) {
+        super(interrupt);
         int numLayers = numUnits.length;
         if (numLayers < 2) {
             throw new IllegalArgumentException("Invalid number of layers: " + numLayers);
@@ -487,15 +493,29 @@ public class NeuralNetwork implements OnlineClassifier<double[]>, SoftClassifier
     }
     
     /**
-     * Private constructor for clone purpose.
+     * Constructor. The activation function of output layer will be chosen
+     * by natural pairing based on the error function and the number of
+     * classes.
+     * 
+     * @param error the error function.
+     * @param interrupt
+     * @param numUnits the number of units in each layer.
      */
-    private NeuralNetwork() {
-        
+    public NeuralNetwork(ErrorFunction error, TrainingInterrupt interrupt, int... numUnits) {
+        this(error, natural(error, numUnits[numUnits.length-1]), interrupt, numUnits);
     }
     
+    /**
+     * Private constructor for clone purpose.
+     * @param interrupt
+     */
+    private NeuralNetwork(TrainingInterrupt interrupt) {
+        super(interrupt);
+    }
+
     @Override
     public NeuralNetwork clone() {
-        NeuralNetwork copycat = new NeuralNetwork();
+        NeuralNetwork copycat = new NeuralNetwork(super.getInterrupt());
         
         copycat.errorFunction = errorFunction;
         copycat.activationFunction = activationFunction;
@@ -526,33 +546,10 @@ public class NeuralNetwork implements OnlineClassifier<double[]>, SoftClassifier
     }
 
     /**
-     * Sets the learning rate.
-     * @param eta the learning rate.
-     */
-    public void setLearningRate(double eta) {
-        if (eta <= 0) {
-            throw new IllegalArgumentException("Invalid learning rate: " + eta);
-        }
-        this.eta = eta;
-    }
-
-    /**
      * Returns the learning rate.
      */
     public double getLearningRate() {
         return eta;
-    }
-
-    /**
-     * Sets the momentum factor.
-     * @param alpha the momentum factor.
-     */
-    public void setMomentum(double alpha) {
-        if (alpha < 0.0 || alpha >= 1.0) {
-            throw new IllegalArgumentException("Invalid momentum factor: " + alpha);
-        }
-        
-        this.alpha = alpha;
     }
 
     /**
@@ -563,271 +560,10 @@ public class NeuralNetwork implements OnlineClassifier<double[]>, SoftClassifier
     }
 
     /**
-     * Sets the weight decay factor. After each weight update, every weight
-     * is simply ''decayed'' or shrunk according w = w * (1 - eta * lambda).
-     * @param lambda the weight decay for regularization.
-     */
-    public void setWeightDecay(double lambda) {
-        if (lambda < 0.0 || lambda > 0.1) {
-            throw new IllegalArgumentException("Invalid weight decay factor: " + lambda);
-        }
-
-        this.lambda = lambda;
-    }
-
-    /**
      * Returns the weight decay factor.
      */
     public double getWeightDecay() {
         return lambda;
-    }
-
-    /**
-     * Sets the input vector into the input layer.
-     * @param x the input vector.
-     */
-    private void setInput(double[] x) {
-        if (x.length != inputLayer.units) {
-            throw new IllegalArgumentException(String.format("Invalid input vector size: %d, expected: %d", x.length, inputLayer.units));
-        }
-        System.arraycopy(x, 0, inputLayer.output, 0, inputLayer.units);
-    }
-
-    /**
-     * Returns the output vector into the given array.
-     * @param y the output vector.
-     */
-    private void getOutput(double[] y) {
-        if (y.length != outputLayer.units) {
-            throw new IllegalArgumentException(String.format("Invalid output vector size: %d, expected: %d", y.length, outputLayer.units));
-        }
-        System.arraycopy(outputLayer.output, 0, y, 0, outputLayer.units);
-    }
-
-    /**
-     * Propagates signals from a lower layer to the next upper layer.
-     * @param lower the lower layer where signals are from.
-     * @param upper the upper layer where signals are propagated to.
-     */
-    private void propagate(Layer lower, Layer upper) {
-        for (int i = 0; i < upper.units; i++) {
-            double sum = 0.0;
-            for (int j = 0; j <= lower.units; j++) {
-                sum += upper.weight[i][j] * lower.output[j];
-            }
-
-            if (upper != outputLayer || activationFunction == ActivationFunction.LOGISTIC_SIGMOID) {
-                upper.output[i] = Math.logistic(sum);
-            } else {
-                if (activationFunction == ActivationFunction.LINEAR || activationFunction == ActivationFunction.SOFTMAX) {
-                    upper.output[i] = sum;
-                } else {
-                    throw new UnsupportedOperationException("Unsupported activation function.");
-                }
-            }
-        }
-
-        if (upper == outputLayer && activationFunction == ActivationFunction.SOFTMAX) {
-            softmax();
-        }
-    }
-
-    /**
-     * Calculate softmax activation function in output layer without overflow.
-     */
-    private void softmax() {
-        double max = Double.NEGATIVE_INFINITY;
-        for (int i = 0; i < outputLayer.units; i++) {
-            if (outputLayer.output[i] > max) {
-                max = outputLayer.output[i];
-            }
-        }
-
-        double sum = 0.0;
-        for (int i = 0; i < outputLayer.units; i++) {
-            double out = Math.exp(outputLayer.output[i] - max);
-            outputLayer.output[i] = out;
-            sum += out;
-        }
-
-        for (int i = 0; i < outputLayer.units; i++) {
-            outputLayer.output[i] /= sum;
-        }
-    }
-
-    /**
-     * Propagates the signals through the neural network.
-     */
-    private void propagate() {
-        for (int l = 0; l < net.length - 1; l++) {
-            propagate(net[l], net[l + 1]);
-        }
-    }
-
-    /**
-     * Returns natural log without underflow.
-     */
-    private static double log(double x) {
-        double y = 0.0;
-        if (x < 1E-300) {
-            y = -690.7755;
-        } else {
-            y = Math.log(x);
-        }
-        return y;
-    }
-
-    /**
-     * Compute the network output error.
-     * @param output the desired output.
-     */
-    private double computeOutputError(double[] output) {
-        return computeOutputError(output, outputLayer.error);
-    }
-    
-    /**
-     * Compute the network output error.
-     * @param output the desired output.
-     * @param gradient the array to store gradient on output.
-     * @return the error defined by loss function.
-     */
-    private double computeOutputError(double[] output, double[] gradient) {
-        if (output.length != outputLayer.units) {
-            throw new IllegalArgumentException(String.format("Invalid output vector size: %d, expected: %d", output.length, outputLayer.units));
-        }
-
-        double error = 0.0;
-        for (int i = 0; i < outputLayer.units; i++) {
-            double out = outputLayer.output[i];
-            double g = output[i] - out;
-
-            if (errorFunction == ErrorFunction.LEAST_MEAN_SQUARES) {
-                error += 0.5 * g * g;
-            } else if (errorFunction == ErrorFunction.CROSS_ENTROPY) {
-                if (activationFunction == ActivationFunction.SOFTMAX) {
-                    error -= output[i] * log(out);
-                } else if (activationFunction == ActivationFunction.LOGISTIC_SIGMOID) {
-                    // We have only one output neuron in this case.
-                    error = -output[i] * log(out) - (1.0 - output[i]) * log(1.0 - out);
-                }
-            }
-
-            if (errorFunction == ErrorFunction.LEAST_MEAN_SQUARES && activationFunction == ActivationFunction.LOGISTIC_SIGMOID) {
-                g *= out * (1.0 - out);
-            }
-
-            gradient[i] = g;
-        }
-
-        return error;
-    }
-
-    /**
-     * Propagates the errors back from a upper layer to the next lower layer.
-     * @param upper the lower layer where errors are from.
-     * @param lower the upper layer where errors are propagated back to.
-     */
-    private void backpropagate(Layer upper, Layer lower) {
-        for (int i = 0; i <= lower.units; i++) {
-            double out = lower.output[i];
-            double err = 0;
-            for (int j = 0; j < upper.units; j++) {
-                err += upper.weight[j][i] * upper.error[j];
-            }
-            lower.error[i] = out * (1.0 - out) * err;
-        }
-    }
-
-    /**
-     * Propagates the errors back through the network.
-     */
-    private void backpropagate() {
-        for (int l = net.length; --l > 0;) {
-            backpropagate(net[l], net[l - 1]);
-        }
-    }
-
-    /**
-     * Adjust network weights by back-propagation algorithm.
-     */
-    private void adjustWeights() {
-        for (int l = 1; l < net.length; l++) {
-            for (int i = 0; i < net[l].units; i++) {
-                for (int j = 0; j <= net[l - 1].units; j++) {
-                    double out = net[l - 1].output[j];
-                    double err = net[l].error[i];
-                    double delta = (1 - alpha) * eta * err * out + alpha * net[l].delta[i][j];
-                    net[l].delta[i][j] = delta;
-                    net[l].weight[i][j] += delta;
-                    if (lambda != 0.0 && j < net[l-1].units) {
-                        net[l].weight[i][j] *= (1.0 - eta * lambda);
-                    }
-                }
-            }
-        }
-    }
-
-    /**
-     * Predict the target value of a given instance. Note that this method is NOT
-     * multi-thread safe.
-     * @param x the instance.
-     * @param y the array to store network output on output. For softmax
-     * activation function, these are estimated posteriori probabilities.
-     * @return the predicted class label.
-     */
-    @Override
-    public int predict(double[] x, double[] y) {
-        setInput(x);
-        propagate();
-        getOutput(y);
-
-        if (outputLayer.units == 1) {
-            if (outputLayer.output[0] > 0.5) {
-                return 0;
-            } else {
-                return 1;
-            }
-        }
-
-        double max = Double.NEGATIVE_INFINITY;
-        int label = -1;
-        for (int i = 0; i < outputLayer.units; i++) {
-            if (outputLayer.output[i] > max) {
-                max = outputLayer.output[i];
-                label = i;
-            }
-        }
-        return label;
-    }
-
-    /**
-     * Predict the class of a given instance. Note that this method is NOT
-     * multi-thread safe.
-     * @param x the instance.
-     * @return the predicted class label.
-     */
-    @Override
-    public int predict(double[] x) {
-        setInput(x);
-        propagate();
-
-        if (outputLayer.units == 1) {
-            if (outputLayer.output[0] > 0.5) {
-                return 0;
-            } else {
-                return 1;
-            }
-        }
-
-        double max = Double.NEGATIVE_INFINITY;
-        int label = -1;
-        for (int i = 0; i < outputLayer.units; i++) {
-            if (outputLayer.output[i] > max) {
-                max = outputLayer.output[i];
-                label = i;
-            }
-        }
-        return label;
     }
 
     /**
@@ -925,6 +661,277 @@ public class NeuralNetwork implements OnlineClassifier<double[]>, SoftClassifier
         int[] index = Math.permutate(n);
         for (int i = 0; i < n; i++) {
             learn(x[index[i]], y[index[i]]);
+        }
+    }
+
+    /**
+     * Predict the class of a given instance. Note that this method is NOT
+     * multi-thread safe.
+     * @param x the instance.
+     * @return the predicted class label.
+     */
+    @Override
+    public int predict(double[] x) {
+        setInput(x);
+        propagate();
+
+        if (outputLayer.units == 1) {
+            if (outputLayer.output[0] > 0.5) {
+                return 0;
+            } else {
+                return 1;
+            }
+        }
+
+        double max = Double.NEGATIVE_INFINITY;
+        int label = -1;
+        for (int i = 0; i < outputLayer.units; i++) {
+            if (outputLayer.output[i] > max) {
+                max = outputLayer.output[i];
+                label = i;
+            }
+        }
+        return label;
+    }
+
+    /**
+     * Predict the target value of a given instance. Note that this method is NOT
+     * multi-thread safe.
+     * @param x the instance.
+     * @param y the array to store network output on output. For softmax
+     * activation function, these are estimated posteriori probabilities.
+     * @return the predicted class label.
+     */
+    @Override
+    public int predict(double[] x, double[] y) {
+        setInput(x);
+        propagate();
+        getOutput(y);
+
+        if (outputLayer.units == 1) {
+            if (outputLayer.output[0] > 0.5) {
+                return 0;
+            } else {
+                return 1;
+            }
+        }
+
+        double max = Double.NEGATIVE_INFINITY;
+        int label = -1;
+        for (int i = 0; i < outputLayer.units; i++) {
+            if (outputLayer.output[i] > max) {
+                max = outputLayer.output[i];
+                label = i;
+            }
+        }
+        return label;
+    }
+
+    /**
+     * Sets the learning rate.
+     * @param eta the learning rate.
+     */
+    public void setLearningRate(double eta) {
+        if (eta <= 0) {
+            throw new IllegalArgumentException("Invalid learning rate: " + eta);
+        }
+        this.eta = eta;
+    }
+
+    /**
+     * Sets the momentum factor.
+     * @param alpha the momentum factor.
+     */
+    public void setMomentum(double alpha) {
+        if (alpha < 0.0 || alpha >= 1.0) {
+            throw new IllegalArgumentException("Invalid momentum factor: " + alpha);
+        }
+        
+        this.alpha = alpha;
+    }
+
+    /**
+     * Sets the weight decay factor. After each weight update, every weight
+     * is simply ''decayed'' or shrunk according w = w * (1 - eta * lambda).
+     * @param lambda the weight decay for regularization.
+     */
+    public void setWeightDecay(double lambda) {
+        if (lambda < 0.0 || lambda > 0.1) {
+            throw new IllegalArgumentException("Invalid weight decay factor: " + lambda);
+        }
+
+        this.lambda = lambda;
+    }
+    
+    /**
+     * Adjust network weights by back-propagation algorithm.
+     */
+    private void adjustWeights() {
+        for (int l = 1; l < net.length; l++) {
+            for (int i = 0; i < net[l].units; i++) {
+                for (int j = 0; j <= net[l - 1].units; j++) {
+                    double out = net[l - 1].output[j];
+                    double err = net[l].error[i];
+                    double delta = (1 - alpha) * eta * err * out + alpha * net[l].delta[i][j];
+                    net[l].delta[i][j] = delta;
+                    net[l].weight[i][j] += delta;
+                    if (lambda != 0.0 && j < net[l-1].units) {
+                        net[l].weight[i][j] *= (1.0 - eta * lambda);
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Propagates the errors back through the network.
+     */
+    private void backpropagate() {
+        for (int l = net.length; --l > 0;) {
+            backpropagate(net[l], net[l - 1]);
+        }
+    }
+
+    /**
+     * Propagates the errors back from a upper layer to the next lower layer.
+     * @param upper the lower layer where errors are from.
+     * @param lower the upper layer where errors are propagated back to.
+     */
+    private void backpropagate(Layer upper, Layer lower) {
+        for (int i = 0; i <= lower.units; i++) {
+            double out = lower.output[i];
+            double err = 0;
+            for (int j = 0; j < upper.units; j++) {
+                err += upper.weight[j][i] * upper.error[j];
+            }
+            lower.error[i] = out * (1.0 - out) * err;
+        }
+    }
+
+    /**
+     * Compute the network output error.
+     * @param output the desired output.
+     */
+    private double computeOutputError(double[] output) {
+        return computeOutputError(output, outputLayer.error);
+    }
+
+    /**
+     * Compute the network output error.
+     * @param output the desired output.
+     * @param gradient the array to store gradient on output.
+     * @return the error defined by loss function.
+     */
+    private double computeOutputError(double[] output, double[] gradient) {
+        if (output.length != outputLayer.units) {
+            throw new IllegalArgumentException(String.format("Invalid output vector size: %d, expected: %d", output.length, outputLayer.units));
+        }
+
+        double error = 0.0;
+        for (int i = 0; i < outputLayer.units; i++) {
+            double out = outputLayer.output[i];
+            double g = output[i] - out;
+
+            if (errorFunction == ErrorFunction.LEAST_MEAN_SQUARES) {
+                error += 0.5 * g * g;
+            } else if (errorFunction == ErrorFunction.CROSS_ENTROPY) {
+                if (activationFunction == ActivationFunction.SOFTMAX) {
+                    error -= output[i] * log(out);
+                } else if (activationFunction == ActivationFunction.LOGISTIC_SIGMOID) {
+                    // We have only one output neuron in this case.
+                    error = -output[i] * log(out) - (1.0 - output[i]) * log(1.0 - out);
+                }
+            }
+
+            if (errorFunction == ErrorFunction.LEAST_MEAN_SQUARES && activationFunction == ActivationFunction.LOGISTIC_SIGMOID) {
+                g *= out * (1.0 - out);
+            }
+
+            gradient[i] = g;
+        }
+
+        return error;
+    }
+
+    /**
+     * Returns the output vector into the given array.
+     * @param y the output vector.
+     */
+    private void getOutput(double[] y) {
+        if (y.length != outputLayer.units) {
+            throw new IllegalArgumentException(String.format("Invalid output vector size: %d, expected: %d", y.length, outputLayer.units));
+        }
+        System.arraycopy(outputLayer.output, 0, y, 0, outputLayer.units);
+    }
+
+    /**
+     * Propagates the signals through the neural network.
+     */
+    private void propagate() {
+        for (int l = 0; l < net.length - 1; l++) {
+            propagate(net[l], net[l + 1]);
+        }
+    }
+
+    /**
+     * Propagates signals from a lower layer to the next upper layer.
+     * @param lower the lower layer where signals are from.
+     * @param upper the upper layer where signals are propagated to.
+     */
+    private void propagate(Layer lower, Layer upper) {
+        for (int i = 0; i < upper.units; i++) {
+            double sum = 0.0;
+            for (int j = 0; j <= lower.units; j++) {
+                sum += upper.weight[i][j] * lower.output[j];
+            }
+
+            if (upper != outputLayer || activationFunction == ActivationFunction.LOGISTIC_SIGMOID) {
+                upper.output[i] = Math.logistic(sum);
+            } else {
+                if (activationFunction == ActivationFunction.LINEAR || activationFunction == ActivationFunction.SOFTMAX) {
+                    upper.output[i] = sum;
+                } else {
+                    throw new UnsupportedOperationException("Unsupported activation function.");
+                }
+            }
+        }
+
+        if (upper == outputLayer && activationFunction == ActivationFunction.SOFTMAX) {
+            softmax();
+        }
+    }
+
+    /**
+     * Sets the input vector into the input layer.
+     * @param x the input vector.
+     */
+    private void setInput(double[] x) {
+        if (x.length != inputLayer.units) {
+            throw new IllegalArgumentException(String.format("Invalid input vector size: %d, expected: %d", x.length, inputLayer.units));
+        }
+        System.arraycopy(x, 0, inputLayer.output, 0, inputLayer.units);
+    }
+
+    /**
+     * Calculate softmax activation function in output layer without overflow.
+     */
+    private void softmax() {
+        double max = Double.NEGATIVE_INFINITY;
+        for (int i = 0; i < outputLayer.units; i++) {
+            if (outputLayer.output[i] > max) {
+                max = outputLayer.output[i];
+            }
+        }
+
+        double sum = 0.0;
+        for (int i = 0; i < outputLayer.units; i++) {
+            double out = Math.exp(outputLayer.output[i] - max);
+            outputLayer.output[i] = out;
+            sum += out;
+        }
+
+        for (int i = 0; i < outputLayer.units; i++) {
+            outputLayer.output[i] /= sum;
         }
     }
 }

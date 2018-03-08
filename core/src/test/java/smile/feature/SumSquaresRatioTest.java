@@ -118,7 +118,7 @@ public class SumSquaresRatioTest {
                 }
             }
 
-            LDA lda = new LDA(xx, y);
+            LDA lda = new LDA(xx, y, null);
             int[] prediction = new int[testn];
             for (int i = 0; i < testn; i++) {
                 prediction[i] = lda.predict(testxx[i]);

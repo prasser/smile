@@ -112,7 +112,7 @@ public class MaxentTest {
         Dataset train = load("sequence/sparse.protein.11.train");
         Dataset test = load("sequence/sparse.protein.11.test");
 
-        Maxent maxent = new Maxent(train.p, train.x, train.y, 0.1, 1E-5, 500);
+        Maxent maxent = new Maxent(train.p, train.x, train.y, 0.1, 1E-5, 500, null);
         
         int error = 0;
         for (int i = 0; i < test.x.length; i++) {
@@ -135,7 +135,7 @@ public class MaxentTest {
         Dataset train = load("sequence/sparse.hyphen.6.train");
         Dataset test = load("sequence/sparse.hyphen.6.test");
 
-        Maxent maxent = new Maxent(train.p, train.x, train.y, 0.1, 1E-5, 500);
+        Maxent maxent = new Maxent(train.p, train.x, train.y, 0.1, 1E-5, 500, null);
 
         int error = 0;
         for (int i = 0; i < test.x.length; i++) {

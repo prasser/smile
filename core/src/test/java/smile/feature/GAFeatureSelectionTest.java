@@ -65,7 +65,7 @@ public class GAFeatureSelectionTest {
 
         int size = 100;
         int generation = 20;
-        ClassifierTrainer<double[]> trainer = new LDA.Trainer();
+        ClassifierTrainer<double[]> trainer = new LDA.Trainer(null);
         ClassificationMeasure measure = new Accuracy();
 
         DelimitedTextParser parser = new DelimitedTextParser();

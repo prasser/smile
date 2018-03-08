@@ -59,7 +59,7 @@ public class KNNDemo extends ClassificationDemo {
         double[][] data = dataset[datasetIndex].toArray(new double[dataset[datasetIndex].size()][]);
         int[] label = dataset[datasetIndex].toArray(new int[dataset[datasetIndex].size()]);
         
-        KNN<double[]> knn = KNN.learn(data, label, k);
+        KNN<double[]> knn = KNN.learn(data, label, k, null);
         for (int i = 0; i < label.length; i++) {
             label[i] = knn.predict(data[i]);
         }

@@ -75,7 +75,7 @@ public class DecisionTreeTest {
                 double[][] trainx = Math.slice(x, loocv.train[i]);
                 int[] trainy = Math.slice(y, loocv.train[i]);
                 
-                DecisionTree tree = new DecisionTree(weather.attributes(), trainx, trainy, 3);
+                DecisionTree tree = new DecisionTree(weather.attributes(), trainx, trainy, 3, null);
                 if (y[loocv.test[i]] != tree.predict(x[loocv.test[i]]))
                     error++;
             }
@@ -107,7 +107,7 @@ public class DecisionTreeTest {
                 double[][] trainx = Math.slice(x, loocv.train[i]);
                 int[] trainy = Math.slice(y, loocv.train[i]);
                 
-                DecisionTree tree = new DecisionTree(iris.attributes(), trainx, trainy, 4);
+                DecisionTree tree = new DecisionTree(iris.attributes(), trainx, trainy, 4, null);
                 if (y[loocv.test[i]] != tree.predict(x[loocv.test[i]]))
                     error++;
             }
@@ -136,7 +136,7 @@ public class DecisionTreeTest {
             double[][] testx = test.toArray(new double[test.size()][]);
             int[] testy = test.toArray(new int[test.size()]);
             
-            DecisionTree tree = new DecisionTree(x, y, 350, DecisionTree.SplitRule.ENTROPY);
+            DecisionTree tree = new DecisionTree(x, y, 350, DecisionTree.SplitRule.ENTROPY, null);
             
             int error = 0;
             for (int i = 0; i < testx.length; i++) {
@@ -191,7 +191,7 @@ public class DecisionTreeTest {
                 attributes[i] = new NominalAttribute("V"+i, values);
             }
             
-            DecisionTree tree = new DecisionTree(attributes, x, y, 350, 2, DecisionTree.SplitRule.ENTROPY);
+            DecisionTree tree = new DecisionTree(attributes, x, y, 350, 2, DecisionTree.SplitRule.ENTROPY, null);
             
             int error = 0;
             for (int i = 0; i < testx.length; i++) {

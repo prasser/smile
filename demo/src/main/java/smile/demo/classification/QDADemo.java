@@ -40,7 +40,7 @@ public class QDADemo extends ClassificationDemo {
         double[][] data = dataset[datasetIndex].toArray(new double[dataset[datasetIndex].size()][]);
         int[] label = dataset[datasetIndex].toArray(new int[dataset[datasetIndex].size()]);
         
-        QDA qda = new QDA(data, label);
+        QDA qda = new QDA(data, label, null);
         for (int i = 0; i < label.length; i++) {
             label[i] = qda.predict(data[i]);
         }

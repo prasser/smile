@@ -140,7 +140,7 @@ public class NaiveBayesTest {
                     }
                 }
 
-                NaiveBayes bayes = new NaiveBayes(priori, condprob);
+                NaiveBayes bayes = new NaiveBayes(priori, condprob, null);
 
                 if (y[loocv.test[l]] != bayes.predict(x[loocv.test[l]]))
                     error++;
@@ -170,7 +170,7 @@ public class NaiveBayesTest {
         for (int i = 0; i < k; i++) {
             double[][] trainx = Math.slice(x, cv.train[i]);
             int[] trainy = Math.slice(y, cv.train[i]);
-            NaiveBayes bayes = new NaiveBayes(NaiveBayes.Model.MULTINOMIAL, 2, feature.length);
+            NaiveBayes bayes = new NaiveBayes(NaiveBayes.Model.MULTINOMIAL, 2, feature.length, null);
 
             bayes.learn(trainx, trainy);
 
@@ -208,7 +208,7 @@ public class NaiveBayesTest {
         for (int i = 0; i < k; i++) {
             double[][] trainx = Math.slice(x, cv.train[i]);
             int[] trainy = Math.slice(y, cv.train[i]);
-            NaiveBayes bayes = new NaiveBayes(NaiveBayes.Model.MULTINOMIAL, 2, feature.length);
+            NaiveBayes bayes = new NaiveBayes(NaiveBayes.Model.MULTINOMIAL, 2, feature.length, null);
 
             for (int j = 0; j < trainx.length; j++) {
                 bayes.learn(trainx[j], trainy[j]);
@@ -248,7 +248,7 @@ public class NaiveBayesTest {
         for (int i = 0; i < k; i++) {
             double[][] trainx = Math.slice(x, cv.train[i]);
             int[] trainy = Math.slice(y, cv.train[i]);
-            NaiveBayes bayes = new NaiveBayes(NaiveBayes.Model.BERNOULLI, 2, feature.length);
+            NaiveBayes bayes = new NaiveBayes(NaiveBayes.Model.BERNOULLI, 2, feature.length, null);
 
             bayes.learn(trainx, trainy);
 
@@ -287,7 +287,7 @@ public class NaiveBayesTest {
         for (int i = 0; i < k; i++) {
             double[][] trainx = Math.slice(x, cv.train[i]);
             int[] trainy = Math.slice(y, cv.train[i]);
-            NaiveBayes bayes = new NaiveBayes(NaiveBayes.Model.BERNOULLI, 2, feature.length);
+            NaiveBayes bayes = new NaiveBayes(NaiveBayes.Model.BERNOULLI, 2, feature.length, null);
 
             for (int j = 0; j < trainx.length; j++) {
                 bayes.learn(trainx[j], trainy[j]);
