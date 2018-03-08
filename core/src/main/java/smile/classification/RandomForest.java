@@ -301,7 +301,7 @@ public class RandomForest extends SoftClassifier<double[]> implements Serializab
          * @throws InterruptedException 
          */
         protected void interrupt() throws TrainingInterruptedException {
-            if (this.interrupt != null && this.interrupt.interrupt) {
+            if (this.interrupt != null && this.interrupt.isInterrupted()) {
                 throw new TrainingInterruptedException();
             }
         }

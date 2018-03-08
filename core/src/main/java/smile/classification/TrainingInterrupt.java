@@ -20,8 +20,7 @@ package smile.classification;
  * 
  * @author Fabian Prasser
  */
-public class TrainingInterrupt {
-
-    /** Flag*/
-    public boolean interrupt = false;
+public interface TrainingInterrupt {
+    
+    public boolean isInterrupted();
 }
